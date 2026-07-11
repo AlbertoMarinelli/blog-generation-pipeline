@@ -1,0 +1,8 @@
+revolut
+wise
+n26
+monzo
+klarna
+qonto
+chime
+bunq
