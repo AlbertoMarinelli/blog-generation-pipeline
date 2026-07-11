@@ -15,3 +15,4 @@ xgboost
 pytrends
 faiss-cpu
 google-genai
+prefect

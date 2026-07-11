@@ -1,4 +1,4 @@
-from app.models.article import Article
+from app.entities.article import Article
 
 
 class Deduplicator:

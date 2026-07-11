@@ -194,3 +194,15 @@ class FintechTopicModeler:
             print(f"Loaded topic model from {self.model_dir}")
         else:
             print("No saved topic model found.")
+
+    def predict_topics(self, docs: list[str]) -> list[int]:
+        self.load_model()
+        if not self.model:
+            print("Nessun modello BERTopic caricato. Impossibile predire i topic.")
+            return [-1] * len(docs)
+        try:
+            topics, _ = self.model.transform(docs)
+            return [int(t) for t in topics]
+        except Exception as e:
+            print(f"Errore durante la predizione dei topic con BERTopic: {e}")
+            return [-1] * len(docs)

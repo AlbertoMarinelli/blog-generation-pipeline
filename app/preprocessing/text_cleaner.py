@@ -4,7 +4,7 @@ from datetime import datetime
 import dateparser
 from bs4 import BeautifulSoup
 
-from app.models.article import Article
+from app.entities.article import Article
 
 
 class TextCleaner:

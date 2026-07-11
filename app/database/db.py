@@ -1,3 +1,4 @@
+import os
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 
@@ -5,8 +6,11 @@ from config import DATABASE_PATH
 from app.database.models import Base
 
 
+# Carica DATABASE_URL dall'ambiente se presente, altrimenti ripiega su SQLite locale
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DATABASE_PATH}")
+
 engine = create_engine(
-    f"sqlite:///{DATABASE_PATH}",
+    DATABASE_URL,
     echo=False
 )
 

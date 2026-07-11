@@ -1,21 +1,18 @@
 import re
 import numpy as np
-from sentence_transformers import SentenceTransformer
 
 from config import COMPETITOR_BLACKLIST_PATH, BRAND_IDENTITY_PATH, COMPLIANCE_SIMILARITY_THRESHOLD
 from app.database.models import ArticleModel
+from app.services.embedding import get_embedding_model
 
 
 class ComplianceFilter:
 
     def __init__(self):
-        self._encoder = None
         self._brand_embedding = None
 
-    def _get_encoder(self) -> SentenceTransformer:
-        if self._encoder is None:
-            self._encoder = SentenceTransformer("all-MiniLM-L6-v2")
-        return self._encoder
+    def _get_encoder(self):
+        return get_embedding_model()
 
     def _get_brand_embedding(self) -> np.ndarray:
         if self._brand_embedding is None:

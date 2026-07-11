@@ -11,7 +11,7 @@ class TrendScorer:
         # Filter out articles with no topic or unclassified (-1)
         valid_articles = [
             a for a in articles 
-            if a.topic_id is not None and a.topic_id != -1
+            if a.topic_id is not None and "Other / Unclassified" not in (a.topic_label or "")
         ]
 
         if not valid_articles:

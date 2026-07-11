@@ -1,7 +1,7 @@
 import trafilatura
 from googlenewsdecoder import new_decoderv1
 
-from app.models.article import Article
+from app.entities.article import Article
 
 
 class ArticleDownloader:
