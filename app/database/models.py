@@ -62,4 +62,20 @@ class TopicTrendModel(Base):
     trend_score: Mapped[float]
 
     computed_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+
+
+class GenerationPlanModel(Base):
+
+    __tablename__ = "generation_plans"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    topic_id: Mapped[int]
+
+    topic_label: Mapped[str]
+
+    allocated_posts: Mapped[int]
+
+    computed_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+
 

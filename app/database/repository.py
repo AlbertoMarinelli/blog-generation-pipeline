@@ -1,7 +1,7 @@
 from sqlalchemy import select
 
 from app.database.db import SessionLocal
-from app.database.models import ArticleModel, TopicTrendModel
+from app.database.models import ArticleModel, TopicTrendModel, GenerationPlanModel
 
 
 class ArticleRepository:
@@ -158,3 +158,28 @@ class ArticleRepository:
             )
 
             return [a for a in articles if a.url not in existing_urls]
+
+    def save_generation_plan(self, plan: list[dict]):
+
+        with SessionLocal() as session:
+
+            # Clear old plan snapshot
+            session.query(GenerationPlanModel).delete()
+
+            for p in plan:
+
+                session.add(
+
+                    GenerationPlanModel(
+
+                        topic_id=p["topic_id"],
+
+                        topic_label=p["topic_label"],
+
+                        allocated_posts=p["allocated_posts"]
+
+                    )
+
+                )
+
+            session.commit()

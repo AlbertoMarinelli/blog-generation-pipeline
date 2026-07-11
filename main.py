@@ -1,7 +1,7 @@
 from collections import Counter
 
 from app.downloaders.article_downloader import ArticleDownloader
-from config import RSS_FEEDS
+from config import RSS_FEEDS, DAILY_POST_BUDGET
 
 from app.collectors.rss import RSSCollector
 from app.preprocessing.text_cleaner import TextCleaner
@@ -13,6 +13,7 @@ from app.topic_modeling.bertopic_model import FintechTopicModeler
 from app.trend_analysis.scorer import TrendScorer
 from app.compliance.compliance_filter import ComplianceFilter
 from googlenewsdecoder import new_decoderv1
+from app.generation.planner import PostPlanner
 
 
 def main():
@@ -130,6 +131,24 @@ def main():
                   f"(Volume: {total_vol}, Compliant: {compliant_vol}/{total_vol}, "
                   f"Freshness: {t['freshness_score']:.2f}, "
                   f"Sources: {int(t['source_diversity'] * total_vol)}/{total_vol})")
+        print("=" * 60)
+
+        print("\nStep 11: Generating daily post allocation plan...")
+        planner = PostPlanner()
+        plan = planner.plan_posts(all_articles, trends)
+        
+        print("Saving daily post allocation plan to SQLite database...")
+        repository.save_generation_plan(plan)
+        print("Daily post allocation plan saved.")
+
+        # Print plan summary
+        print("\n" + "=" * 60)
+        print(f"DAILY POST ALLOCATION PLAN (Budget: {DAILY_POST_BUDGET} posts)")
+        print("=" * 60)
+        for p in plan:
+            if p["allocated_posts"] > 0:
+                print(f"[{p['allocated_posts']:2d} posts] {p['topic_label']} "
+                      f"(Compliance: {int(p['compliance_rate'] * 100)}%, Trend Score: {p['trend_score']:.2f})")
         print("=" * 60)
 
     except Exception as e:
