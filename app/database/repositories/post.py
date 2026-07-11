@@ -40,3 +40,11 @@ class GeneratedPostRepository:
                 select(GeneratedPostModel.id, GeneratedPostModel.embedding)
             ).all()
             return [(r[0], r[1]) for r in results if r[1] is not None]
+
+    def get_posts_by_ids(self, ids: list[int]) -> list[GeneratedPostModel]:
+        if not ids:
+            return []
+        with self.session_factory() as session:
+            return list(session.scalars(
+                select(GeneratedPostModel).where(GeneratedPostModel.id.in_(ids))
+            ).all())

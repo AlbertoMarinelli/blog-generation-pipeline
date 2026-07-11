@@ -8,7 +8,8 @@ from app.pipeline import (
     run_classify_new_articles,
     run_analyze,
     run_generate,
-    run_all
+    run_all,
+    run_build_index
 )
 
 # Configura il logging di base per la console
@@ -46,6 +47,7 @@ def main():
     subparsers.add_parser("classify", help="Classifica gli articoli conformi non assegnati usando il modello esistente.")
     subparsers.add_parser("analyze", help="Esegue topic modeling BERTopic, scoring trend XGBoost e piano post.")
     subparsers.add_parser("generate", help="Genera gli articoli di blog finali (RAG + Gemini) basati sul piano.")
+    subparsers.add_parser("build-index", help="Costruisce o rigenera l'indice vettoriale dei post pubblicati usando FAISS.")
     subparsers.add_parser("run-all", help="Avvia l'intera pipeline in sequenza (comportamento predefinito).")
 
     args = parser.parse_args()
@@ -66,6 +68,8 @@ def main():
         run_analyze()
     elif args.command == "generate":
         run_generate()
+    elif args.command == "build-index":
+        run_build_index()
     elif args.command == "run-all" or not args.command:
         # Se non viene specificato alcun comando, esegui tutto (retrocompatibilità)
         if not args.command:

@@ -412,6 +412,18 @@ def run_generate():
             if max_sim > 0.92:
                 logger.warning(f"  [Post {post_idx}/{budget}] ALTA SIMILARITÀ rilevata ({max_sim:.2%}) con post storici. Possibile duplicato!")
 
+            # Cerca ed aggancia post correlati già pubblicati
+            from app.services.published_index import PublishedPostsIndex
+            pub_index = PublishedPostsIndex()
+            related_ids = pub_index.search_similar_posts(new_emb, k=2)
+            related_posts = post_repo.get_posts_by_ids(related_ids)
+            if related_posts:
+                references_md = "\n\n### Articoli Consigliati\n"
+                for rp in related_posts:
+                    references_md += f"* [{rp.title}]({rp.url})\n"
+                post_content += references_md
+                logger.info(f"  [Post {post_idx}/{budget}] Agganciati {len(related_posts)} articoli correlati come reference in coda.")
+
             # Salvataggio nel database
             needs_review_flag = seo_score < 60.0
             post_repo.save_post(
@@ -458,3 +470,12 @@ def run_all():
     run_analyze()
     run_generate()
     logger.info("=== PIPELINE COMPLETATA CON SUCCESSO ===")
+
+
+def run_build_index():
+    """Costruisce o aggiorna l'indice vettoriale dei post già pubblicati."""
+    init_database()
+    logger.info("Inizio indicizzazione vettoriale dei post pubblicati...")
+    from app.services.published_index import PublishedPostsIndex
+    indexer = PublishedPostsIndex()
+    indexer.build_index_from_db()
