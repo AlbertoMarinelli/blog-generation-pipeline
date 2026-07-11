@@ -12,6 +12,7 @@ from app.database.repository import ArticleRepository
 from app.topic_modeling.bertopic_model import FintechTopicModeler
 from app.trend_analysis.scorer import TrendScorer
 from app.compliance.compliance_filter import ComplianceFilter
+from googlenewsdecoder import new_decoderv1
 
 
 def main():
@@ -27,25 +28,42 @@ def main():
         print("No articles found in feeds.")
         return
 
-    print("\nStep 3: Downloading full article contents (limiting batch to 100 for speed/stability)...")
-    articles = articles[:100]
-    downloader = ArticleDownloader()
-    articles = downloader.process(articles)
-    print(f"Successfully downloaded {len(articles)} article bodies.")
+    print("\nStep 3: Decoding Google News links and deduplicating...")
+    for article in articles:
+        if "news.google.com" in article.url:
+            try:
+                decoded = new_decoderv1(article.url)
+                if decoded.get("status"):
+                    article.url = decoded["decoded_url"]
+            except Exception:
+                pass
 
-    print("\nStep 4: Cleaning text and standardizing dates...")
-    cleaner = TextCleaner()
-    articles = cleaner.process(articles)
-
-    print("\nStep 5: Deduplicating articles...")
     deduplicator = Deduplicator()
     articles = deduplicator.process(articles)
-    print(f"Found {len(articles)} unique articles in this batch.")
+    print(f"Found {len(articles)} unique articles in feed batch.")
 
-    print("\nStep 6: Saving new articles to database...")
+    print("\nStep 4: Filtering out articles already saved in the database...")
     repository = ArticleRepository()
-    saved = repository.save_many(articles)
-    print(f"Saved {saved} new articles to SQLite database.")
+    articles = repository.filter_new_articles(articles)
+    print(f"Found {len(articles)} new articles not in the database.")
+
+    if articles:
+        print("\nStep 5: Downloading full article contents (limiting batch to 100 for speed/stability)...")
+        articles = articles[:100]
+        downloader = ArticleDownloader()
+        articles = downloader.process(articles)
+        print(f"Successfully downloaded {len(articles)} article bodies.")
+
+        print("\nStep 6: Cleaning text and standardizing dates...")
+        cleaner = TextCleaner()
+        articles = cleaner.process(articles)
+
+        print("\nStep 7: Saving new articles to database...")
+        saved = repository.save_many(articles)
+        print(f"Saved {saved} new articles to SQLite database.")
+    else:
+        print("\nSkipping download and cleaning: no new articles found.")
+
 
     # Evaluate compliance for pending articles
     print("\nStep 7a: Evaluating compliance for pending articles...")

@@ -146,3 +146,15 @@ class ArticleRepository:
                         article.embedding = update["embedding"]
 
             session.commit()
+
+    def filter_new_articles(self, articles: list) -> list:
+
+        with SessionLocal() as session:
+
+            existing_urls = set(
+                session.scalars(
+                    select(ArticleModel.url)
+                ).all()
+            )
+
+            return [a for a in articles if a.url not in existing_urls]
