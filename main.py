@@ -30,7 +30,9 @@ def main():
         return
 
     print("\nStep 3: Decoding Google News links and deduplicating...")
-    for article in articles:
+    from concurrent.futures import ThreadPoolExecutor
+
+    def decode_single(article):
         if "news.google.com" in article.url:
             try:
                 decoded = new_decoderv1(article.url)
@@ -38,6 +40,10 @@ def main():
                     article.url = decoded["decoded_url"]
             except Exception:
                 pass
+        return article
+
+    with ThreadPoolExecutor(max_workers=25) as executor:
+        articles = list(executor.map(decode_single, articles))
 
     deduplicator = Deduplicator()
     articles = deduplicator.process(articles)
