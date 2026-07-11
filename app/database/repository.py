@@ -65,3 +65,17 @@ class ArticleRepository:
                     article.topic_label = update["topic_label"]
 
             session.commit()
+
+    def update_article_embeddings(self, updates: list[dict]):
+
+        with SessionLocal() as session:
+
+            for update in updates:
+
+                article = session.get(ArticleModel, update["id"])
+
+                if article:
+
+                    article.embedding = update["embedding"]
+
+            session.commit()

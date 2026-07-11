@@ -57,7 +57,7 @@ def main():
     print("\nStep 8: Discovering topics using BERTopic...")
     modeler = FintechTopicModeler()
     try:
-        topics, topic_labels = modeler.train(all_articles)
+        topics, topic_labels = modeler.train(all_articles, repository=repository)
         
         # Prepare list of updates to save back to database
         updates = []

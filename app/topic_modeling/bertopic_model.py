@@ -18,7 +18,7 @@ class FintechTopicModeler:
         self.viz_dir = Path(viz_dir)
         self.model = None
 
-    def train(self, articles: list[ArticleModel]) -> tuple[list[int], dict[int, str]]:
+    def train(self, articles: list[ArticleModel], repository=None) -> tuple[list[int], dict[int, str]]:
         if not articles:
             raise ValueError("No articles provided for training.")
 
@@ -39,14 +39,49 @@ class FintechTopicModeler:
         num_docs = len(docs)
         print(f"Training BERTopic on {num_docs} articles...")
 
+        # Collect existing embeddings and identify articles that need embedding
+        articles_to_embed = []
+        embeddings_list = []
+        
+        for i, a in enumerate(articles):
+            text = docs[i]
+            if a.embedding is not None:
+                # Convert bytes back to numpy array
+                emb = np.frombuffer(a.embedding, dtype=np.float32)
+                embeddings_list.append((a.id, emb))
+            else:
+                articles_to_embed.append((a.id, text))
+
+        # Dynamically calculate embeddings for missing articles only
+        if articles_to_embed:
+            print(f"Computing embeddings for {len(articles_to_embed)} new/uncached articles...")
+            encoder = SentenceTransformer("all-MiniLM-L6-v2")
+            new_texts = [text for _, text in articles_to_embed]
+            new_embs = encoder.encode(new_texts, show_progress_bar=True, convert_to_numpy=True)
+            
+            if repository is not None:
+                db_updates = []
+                for (article_id, _), emb in zip(articles_to_embed, new_embs):
+                    emb_bytes = emb.astype(np.float32).tobytes()
+                    db_updates.append({"id": article_id, "embedding": emb_bytes})
+                repository.update_article_embeddings(db_updates)
+                print(f"Saved {len(db_updates)} new embeddings to SQLite database.")
+            
+            for (article_id, _), emb in zip(articles_to_embed, new_embs):
+                embeddings_list.append((article_id, emb))
+        else:
+            print("All articles have cached embeddings. Skipping SentenceTransformer encoding.")
+
+        # Reconstruct the full embeddings matrix aligned with docs
+        emb_dict = dict(embeddings_list)
+        all_embeddings = np.array([emb_dict[a.id] for a in articles], dtype=np.float32)
+
         # Dynamically set clustering parameters based on dataset size
         # to prevent HDBSCAN crash/excessive noise on smaller datasets.
         min_cluster_size = min(10, max(2, num_docs // 15))
         min_samples = max(1, min_cluster_size // 2)
 
-        # Initialize sub-components
-        embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
-        
+        # Initialize sub-components (using string identifier for embedding_model to avoid unnecessary loading)
         umap_model = UMAP(
             n_neighbors=min(15, num_docs - 1),
             n_components=min(5, num_docs - 2),
@@ -69,14 +104,14 @@ class FintechTopicModeler:
         )
 
         self.model = BERTopic(
-            embedding_model=embedding_model,
+            embedding_model="all-MiniLM-L6-v2",
             umap_model=umap_model,
             hdbscan_model=hdbscan_model,
             vectorizer_model=vectorizer_model,
             calculate_probabilities=False
         )
 
-        topics, _ = self.model.fit_transform(docs)
+        topics, _ = self.model.fit_transform(docs, embeddings=all_embeddings)
 
         # Extract topic labels (e.g., "0_open_banking_api")
         topic_labels = {}

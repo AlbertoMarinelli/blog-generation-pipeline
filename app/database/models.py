@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
+from sqlalchemy import LargeBinary
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
@@ -33,3 +34,5 @@ class ArticleModel(Base):
     topic_id: Mapped[Optional[int]] = mapped_column(nullable=True)
 
     topic_label: Mapped[Optional[str]] = mapped_column(nullable=True)
+
+    embedding: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
