@@ -1,11 +1,8 @@
 import datetime
+import os
+from jinja2 import Environment, FileSystemLoader
 from config import GEMINI_MOCK_MODE, GEMINI_API_KEY
 from app.database.models import ArticleModel
-from app.generation.prompts import (
-    SYSTEM_INSTRUCTION,
-    RAG_USER_PROMPT_TEMPLATE,
-    NO_RAG_USER_PROMPT_TEMPLATE
-)
 
 
 class BlogGenerator:
@@ -13,6 +10,10 @@ class BlogGenerator:
     def __init__(self):
         self.mock_mode = GEMINI_MOCK_MODE
         self.api_key = GEMINI_API_KEY
+        
+        # Inizializza l'ambiente Jinja2 per i template
+        template_dir = os.path.join(os.path.dirname(__file__), 'templates')
+        self.jinja_env = Environment(loader=FileSystemLoader(template_dir))
 
     def generate_post(self, topic_label: str, keywords: str, search_trends: str, rag_articles: list[ArticleModel], feedback: str = None) -> str:
         if self.mock_mode:
@@ -92,39 +93,26 @@ In linea con le nostre linee guida di posizionamento sul mercato, promuoviamo so
         # Initialize the official Gemini SDK client
         client = genai.Client(api_key=self.api_key)
 
-        # Build prompt RAG context or select prompt template
-        if rag_articles:
-            articles_context = ""
-            for i, art in enumerate(rag_articles):
-                articles_context += f"--- SOURCE ARTICLE {i+1} ---\n"
-                articles_context += f"Title: {art.title}\n"
-                articles_context += f"Source: {art.source}\n"
-                articles_context += f"URL: {art.url}\n"
-                articles_context += f"Summary/Content: {art.content if art.content else art.summary}\n\n"
-            
-            user_content = RAG_USER_PROMPT_TEMPLATE.format(
-                topic_label=topic_label,
-                keywords=keywords,
-                search_trends=search_trends,
-                articles_context=articles_context
-            )
-        else:
-            user_content = NO_RAG_USER_PROMPT_TEMPLATE.format(
-                topic_label=topic_label,
-                keywords=keywords,
-                search_trends=search_trends
-            )
+        # Carica e renderizza il prompt tramite Jinja2
+        template = self.jinja_env.get_template('post_generation.jinja')
+        user_content = template.render(
+            topic_label=topic_label,
+            keywords=keywords,
+            search_trends=search_trends,
+            rag_articles=rag_articles,
+            feedback=feedback
+        )
 
-        # Se è presente un feedback correttivo, lo appendiamo in fondo per forzare le correzioni SEO
-        if feedback:
-            user_content += f"\n\n--- FEEDBACK CORRETTIVO DI COPIATURA (Risolvi obbligatoriamente i seguenti problemi) ---\n{feedback}\n"
+        # Carica le istruzioni di sistema dal template
+        system_instruction_tmpl = self.jinja_env.get_template('system_instruction.jinja')
+        system_instruction = system_instruction_tmpl.render()
 
         # Generate content using gemini-1.5-flash
         response = client.models.generate_content(
             model="gemini-1.5-flash",
             contents=user_content,
             config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_INSTRUCTION,
+                system_instruction=system_instruction,
                 temperature=0.7,
                 top_p=0.95,
                 max_output_tokens=2048

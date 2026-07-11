@@ -1,0 +1,39 @@
+Scrivi un articolo di blog dettagliato sul seguente argomento:
+Topic: {{ topic_label }}
+Trend Keywords: {{ keywords }}
+Ricerche correlate da Google Trends: {{ search_trends }}
+
+{% if rag_articles %}
+Utilizza come fonti e contesto i seguenti articoli (sintetizzali e citali professionalmente nel testo):
+{% for art in rag_articles %}
+--- SOURCE ARTICLE {{ loop.index }} ---
+Title: {{ art.title }}
+Source: {{ art.source }}
+URL: {{ art.url }}
+Summary/Content: {{ art.content if art.content else art.summary }}
+
+{% endfor %}
+{% else %}
+Attenzione: Per questo post non ci sono articoli di cronaca diretta disponibili nel nostro database. Scrivi un articolo di analisi teorica e di scenario basandoti sulle keyword e sul macro-topic fornito.
+{% endif %}
+
+Linee guida SEO e Struttura (MANDATORIE):
+1. Inizia il documento esattamente con un blocco YAML Front Matter delimitato da tre trattini (---) contenente i seguenti campi:
+   ---
+   title: "[Scrivi un titolo SEO accattivante e ottimizzato di massimo 60 caratteri]"
+   meta_description: "[Scrivi una meta descrizione di 150-160 caratteri contenente le parole chiave]"
+   slug: "[Genera una slug URL ottimizzata per SEO, tutta in minuscolo con trattini, es. open-banking-trends-2026]"
+   ---
+2. Subito dopo il blocco Front Matter, scrivi il Titolo H1 principale dell'articolo (es. # Titolo dell'articolo).
+3. Integra la parola chiave principale (la prima di Trend Keywords) nelle prime 100 parole dell'articolo (nell'introduzione).
+4. Struttura l'articolo usando titoli H2 (## ) ed H3 (### ) per dividere i capitoli. Integra le keyword in modo naturale nei titoli.
+{% if rag_articles %}
+5. Inserisci citazioni alle fonti fornite nel testo utilizzando anchor text puliti e descrittivi (es. "...come riportato da [Finextra](url)..." oppure "...in base alle ultime novità di [TechCrunch](url)..."), senza incollare URL grezzi nel corpo del testo.
+{% endif %}
+6. Dedica una sezione finale su come la nostra brand identity fintech risponda a questi cambiamenti, focalizzandoti su sicurezza, conformità e open API.
+7. Evita assolutamente nomi di competitor (se presenti nelle fonti, ignorali o generalizzali).
+
+{% if feedback %}
+--- FEEDBACK CORRETTIVO DI COPIATURA (Risolvi obbligatoriamente i seguenti problemi dell'articolo precedente) ---
+{{ feedback }}
+{% endif %}

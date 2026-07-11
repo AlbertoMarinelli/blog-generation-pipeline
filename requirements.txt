@@ -16,3 +16,4 @@ pytrends
 faiss-cpu
 google-genai
 prefect
+jinja2
