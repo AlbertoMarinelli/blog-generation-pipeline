@@ -32,6 +32,9 @@ def main():
     print("\nStep 3: Decoding Google News links and deduplicating...")
     from concurrent.futures import ThreadPoolExecutor
 
+    # Slice to top 150 articles to prioritize freshness and avoid rate limiting
+    articles = articles[:150]
+
     def decode_single(article):
         if "news.google.com" in article.url:
             try:
@@ -42,7 +45,7 @@ def main():
                 pass
         return article
 
-    with ThreadPoolExecutor(max_workers=25) as executor:
+    with ThreadPoolExecutor(max_workers=5) as executor:
         articles = list(executor.map(decode_single, articles))
 
     deduplicator = Deduplicator()

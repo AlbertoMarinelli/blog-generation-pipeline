@@ -41,6 +41,9 @@ class ArticleModel(Base):
 
     compliance_reason: Mapped[Optional[str]] = mapped_column(nullable=True)
 
+    is_used: Mapped[bool] = mapped_column(default=False)
+
+
 
 
 class TopicTrendModel(Base):

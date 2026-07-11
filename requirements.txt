@@ -13,3 +13,5 @@ hdbscan
 googlenewsdecoder
 xgboost
 pytrends
+faiss-cpu
+google-genai

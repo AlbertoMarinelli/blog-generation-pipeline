@@ -187,3 +187,29 @@ class ArticleRepository:
                 )
 
             session.commit()
+
+    def get_unused_compliant_by_topic(self, topic_id: int) -> list[ArticleModel]:
+
+        with SessionLocal() as session:
+
+            return session.scalars(
+                select(ArticleModel).where(
+                    ArticleModel.topic_id == topic_id,
+                    ArticleModel.is_compliant == True,
+                    ArticleModel.is_used == False
+                )
+            ).all()
+
+    def mark_articles_as_used(self, article_ids: list[int]):
+
+        with SessionLocal() as session:
+
+            for aid in article_ids:
+
+                article = session.get(ArticleModel, aid)
+
+                if article:
+
+                    article.is_used = True
+
+            session.commit()
