@@ -16,13 +16,15 @@ class ArticleRepository:
                 ).all()
             )
 
+            seen_in_batch = set()
             new_articles = []
 
             for article in articles:
 
-                if article.url in existing_urls:
+                if article.url in existing_urls or article.url in seen_in_batch:
                     continue
 
+                seen_in_batch.add(article.url)
                 new_articles.append(
                     ArticleModel(
                         title=article.title,
@@ -47,3 +49,19 @@ class ArticleRepository:
             return session.scalars(
                 select(ArticleModel)
             ).all()
+
+    def update_article_topics(self, updates: list[dict]):
+
+        with SessionLocal() as session:
+
+            for update in updates:
+
+                article = session.get(ArticleModel, update["id"])
+
+                if article:
+
+                    article.topic_id = update["topic_id"]
+
+                    article.topic_label = update["topic_label"]
+
+            session.commit()

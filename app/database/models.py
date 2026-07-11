@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm import Mapped
@@ -28,3 +29,7 @@ class ArticleModel(Base):
     published: Mapped[str]
 
     inserted_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+
+    topic_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+
+    topic_label: Mapped[Optional[str]] = mapped_column(nullable=True)

@@ -5,3 +5,9 @@ pandas
 sqlalchemy
 python-dotenv
 trafilatura
+bertopic
+sentence-transformers
+scikit-learn
+umap-learn
+hdbscan
+googlenewsdecoder
