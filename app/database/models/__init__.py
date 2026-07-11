@@ -3,6 +3,7 @@ from app.database.models.topic import TopicModel
 from app.database.models.article import ArticleModel
 from app.database.models.trend import TopicTrendModel
 from app.database.models.plan import GenerationPlanModel
+from app.database.models.post import GeneratedPostModel
 
 __all__ = [
     "Base",
@@ -10,4 +11,5 @@ __all__ = [
     "ArticleModel",
     "TopicTrendModel",
     "GenerationPlanModel",
+    "GeneratedPostModel",
 ]

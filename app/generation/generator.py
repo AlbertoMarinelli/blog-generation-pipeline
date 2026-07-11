@@ -14,13 +14,13 @@ class BlogGenerator:
         self.mock_mode = GEMINI_MOCK_MODE
         self.api_key = GEMINI_API_KEY
 
-    def generate_post(self, topic_label: str, keywords: str, search_trends: str, rag_articles: list[ArticleModel]) -> str:
+    def generate_post(self, topic_label: str, keywords: str, search_trends: str, rag_articles: list[ArticleModel], feedback: str = None) -> str:
         if self.mock_mode:
-            return self._generate_mock_post(topic_label, keywords, search_trends, rag_articles)
+            return self._generate_mock_post(topic_label, keywords, search_trends, rag_articles, feedback=feedback)
         else:
-            return self._generate_gemini_post(topic_label, keywords, search_trends, rag_articles)
+            return self._generate_gemini_post(topic_label, keywords, search_trends, rag_articles, feedback=feedback)
 
-    def _generate_mock_post(self, topic_label: str, keywords: str, search_trends: str, rag_articles: list[ArticleModel]) -> str:
+    def _generate_mock_post(self, topic_label: str, keywords: str, search_trends: str, rag_articles: list[ArticleModel], feedback: str = None) -> str:
         # Extract main keywords for header
         kw_list = [k.strip() for k in keywords.split(",") if k.strip()]
         main_kw = kw_list[0].capitalize() if kw_list else "Innovazione Fintech"
@@ -44,33 +44,42 @@ class BlogGenerator:
                 "delle infrastrutture bancarie digitali e sulle tendenze di crescita a medio termine.\n\n"
             )
 
-        # Mock post template
-        post_md = f"""# L'impatto di {main_kw} nel Futuro del Fintech
-            *Data di pubblicazione: {date_str}*  
-            *Trend Keywords: {keywords}*  
-            *Google Trends Correlati: {search_trends if search_trends else "Nessuno"}*
+        slug = f"impatto-{main_kw.lower().replace(' ', '-')}-futuro-fintech"
+        
+        # Mock post template with clean markdown structure and YAML Front Matter
+        post_md = f"""---
+title: "L'impatto di {main_kw} nel Futuro del Fintech"
+meta_description: "Scopri come {main_kw.lower()} e {sub_kw.lower()} stanno ridefinendo i servizi finanziari digitali nel settore fintech."
+slug: "{slug}"
+---
 
-            ---
+# L'impatto di {main_kw} nel Futuro del Fintech
+*Data di pubblicazione: {date_str}*  
+*Trend Keywords: {keywords}*  
+*Google Trends Correlati: {search_trends if search_trends else "Nessuno"}*
 
-            ## Introduzione
-            La rapida evoluzione tecnologica sta spingendo il settore finanziario verso una digitalizzazione senza precedenti. In questo contesto, tematiche calde come **{main_kw.lower()}** e **{sub_kw}** stanno ridefinendo il modo in cui aziende e consumatori interagiscono con il denaro. Questa analisi esplora le ultime novità del mercato basandosi su fonti autorevoli.
+---
 
-            ## Analisi del Mercato e Notizie Rilevanti
-            Le recenti notizie evidenziano sviluppi cruciali in ambito **{topic_label.replace("Topic ", "Argomento ")}**:
+## Introduzione
+La rapida evoluzione tecnologica sta spingendo il settore finanziario verso una digitalizzazione senza precedenti. In questo contesto, tematiche calde come **{main_kw.lower()}** e **{sub_kw}** stanno ridefinendo il modo in cui aziende e consumatori interagiscono con il denaro. Questa analisi esplora le ultime novità del mercato basandosi su fonti autorevoli.
 
-            {articles_section}
-            ## Il Nostro Posizionamento (Fintech Identity)
-            In linea con le nostre linee guida di posizionamento sul mercato, promuoviamo soluzioni che mettono al centro l'utente, garantendo:
-            * **Trasparenza e Sicurezza**: Zero compromessi sulla protezione dei dati, in linea con le normative vigenti.
-            * **Integrazione Open Finance**: Crediamo in ecosistemi aperti e API sicure per abilitare la collaborazione finanziaria.
-            * **Inclusione e Scalabilità**: Rendiamo i servizi fintech accessibili a tutti, semplificando la complessità operativa.
+## Analisi del Mercato e Notizie Rilevanti
+Le recenti notizie evidenziano sviluppi cruciali in ambito **{topic_label.replace("Topic ", "Argomento ")}**:
 
-            ---
-            *Vuoi saperne di più? Registrati alla nostra newsletter o contatta il nostro team di esperti.*
-            """
+{articles_section}
+
+## Il Nostro Posizionamento (Fintech Identity)
+In linea con le nostre linee guida di posizionamento sul mercato, promuoviamo soluzioni che mettono al centro l'utente, garantendo:
+* **Trasparenza e Sicurezza**: Zero compromessi sulla protezione dei dati, in linea con le normative vigenti.
+* **Integrazione Open Finance**: Crediamo in ecosistemi aperti e API sicure per abilitare la collaborazione finanziaria.
+* **Inclusione e Scalabilità**: Rendiamo i servizi fintech accessibili a tutti, semplificando la complessità operativa.
+
+---
+*Vuoi saperne di più? Registrati alla nostra newsletter o contatta il nostro team di esperti.*
+"""
         return post_md
 
-    def _generate_gemini_post(self, topic_label: str, keywords: str, search_trends: str, rag_articles: list[ArticleModel]) -> str:
+    def _generate_gemini_post(self, topic_label: str, keywords: str, search_trends: str, rag_articles: list[ArticleModel], feedback: str = None) -> str:
         try:
             from google import genai
             from google.genai import types
@@ -105,6 +114,10 @@ class BlogGenerator:
                 keywords=keywords,
                 search_trends=search_trends
             )
+
+        # Se è presente un feedback correttivo, lo appendiamo in fondo per forzare le correzioni SEO
+        if feedback:
+            user_content += f"\n\n--- FEEDBACK CORRETTIVO DI COPIATURA (Risolvi obbligatoriamente i seguenti problemi) ---\n{feedback}\n"
 
         # Generate content using gemini-1.5-flash
         response = client.models.generate_content(

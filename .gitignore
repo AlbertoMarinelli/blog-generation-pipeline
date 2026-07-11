@@ -69,9 +69,6 @@ Thumbs.db
 
 # Project-specific database and data directories
 data/*.db
-data/raw/*
-!data/raw/.gitkeep
-data/processed/*
-!data/processed/.gitkeep
 data/models/
 data/visualizations/
+data/posts/

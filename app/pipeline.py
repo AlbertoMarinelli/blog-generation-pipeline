@@ -1,4 +1,6 @@
 import logging
+import re
+import numpy as np
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
@@ -9,7 +11,9 @@ from app.database.repositories import (
     TopicTrendRepository,
     GenerationPlanRepository,
     TopicRepository,
+    GeneratedPostRepository,
 )
+from app.services.seo_checker import SEOQualityChecker
 from app.collectors.rss import RSSCollector
 from app.preprocessing.text_cleaner import TextCleaner
 from app.preprocessing.deduplicator import Deduplicator
@@ -342,6 +346,13 @@ def run_generate():
         # Raggruppa gli articoli per chunk da 3
         chunks = [retrieved_all[i : i + 3] for i in range(0, len(retrieved_all), 3)]
 
+        post_repo = GeneratedPostRepository()
+        seo_checker = SEOQualityChecker()
+
+        # Carica gli embedding esistenti per il confronto
+        past_posts = post_repo.get_all_embeddings()
+        past_embeddings = [np.frombuffer(p[1], dtype=np.float32) for p in past_posts]
+
         for post_idx in range(1, budget + 1):
             post_articles = chunks[post_idx - 1] if post_idx - 1 < len(chunks) else []
 
@@ -352,12 +363,82 @@ def run_generate():
                 rag_articles=post_articles
             )
 
+            # Estrai slug e titolo dal Front Matter
+            slug_match = re.search(r"^slug:\s*(.+)$", post_content, re.MULTILINE)
+            slug = slug_match.group(1).strip("'\" ") if slug_match else f"topic-{topic_id}-post-{post_idx}"
+            url = f"/blog/{slug}"
+
+            title_match = re.search(r"^title:\s*(.+)$", post_content, re.MULTILINE)
+            title = title_match.group(1).strip("'\" ") if title_match else f"Post {topic_label}"
+
+            # Valutazione SEO iniziale
+            seo_res = seo_checker.check_seo(post_content, keywords)
+            seo_score = seo_res["score"]
+
+            # Auto-correzione: se il punteggio SEO è inferiore a 60, tenta un secondo invio correttivo
+            if seo_score < 60.0:
+                logger.warning(f"  [Post {post_idx}/{budget}] Punteggio SEO insufficiente ({seo_score}/100). Tentativo di auto-correzione...")
+                feedback = (
+                    f"Il testo precedente ha ottenuto un punteggio SEO insufficiente ({seo_score}/100) per i seguenti motivi:\n"
+                    + "\n".join([f"- {w}" for w in seo_res["warnings"]])
+                    + "\nPer favore riscrivi l'articolo assicurandoti di espanderlo (minimo 500 parole), strutturare bene gli heading H1 (# ), H2 (## ), H3 (### ) ed inserire in modo naturale le parole chiave."
+                )
+                post_content = generator.generate_post(
+                    topic_label=topic_label,
+                    keywords=keywords,
+                    search_trends=search_trends,
+                    rag_articles=post_articles,
+                    feedback=feedback
+                )
+                
+                # Rivalutazione SEO post-correzione
+                seo_res = seo_checker.check_seo(post_content, keywords)
+                seo_score = seo_res["score"]
+                
+                # Riestrai titolo e slug corretti se cambiati
+                slug_match = re.search(r"^slug:\s*(.+)$", post_content, re.MULTILINE)
+                if slug_match:
+                    slug = slug_match.group(1).strip("'\" ")
+                    url = f"/blog/{slug}"
+                title_match = re.search(r"^title:\s*(.+)$", post_content, re.MULTILINE)
+                if title_match:
+                    title = title_match.group(1).strip("'\" ")
+
+            # Calcolo embedding del post
+            new_emb = encoder.encode(post_content, convert_to_numpy=True)
+            
+            # Controllo duplicati semantici
+            max_sim = seo_checker.check_similarity(new_emb, past_embeddings)
+            if max_sim > 0.92:
+                logger.warning(f"  [Post {post_idx}/{budget}] ALTA SIMILARITÀ rilevata ({max_sim:.2%}) con post storici. Possibile duplicato!")
+
+            # Salvataggio nel database
+            needs_review_flag = seo_score < 60.0
+            post_repo.save_post(
+                topic_id=topic_id,
+                title=title,
+                content=post_content,
+                url=url,
+                embedding=new_emb.astype(np.float32).tobytes(),
+                seo_score=seo_score,
+                max_similarity=max_sim,
+                needs_review=needs_review_flag
+            )
+
+            # Aggiungi il nuovo embedding alla lista per i confronti successivi nello stesso batch
+            past_embeddings.append(new_emb)
+
+            # Salvataggio su file markdown
             filename = f"topic_{topic_id}_post_{post_idx}.md"
             filepath = posts_dir / filename
             filepath.write_text(post_content, encoding="utf-8")
 
             is_rag = "RAG" if post_articles else "NO-RAG"
-            logger.info(f"  [Post {post_idx}/{budget}] Generato '{filename}' ({is_rag} mode, fonti RAG associate: {len(post_articles)})")
+            review_status = " [NECESSITA REVISIONE]" if needs_review_flag else ""
+            logger.info(
+                f"  [Post {post_idx}/{budget}] Generato '{filename}' ({is_rag} mode, "
+                f"SEO Score: {seo_score}/100, Max Similarity: {max_sim:.2%}){review_status}"
+            )
             total_generated += 1
 
         # Aggiorna gli articoli come usati
