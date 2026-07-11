@@ -32,4 +32,14 @@ def init_db():
     if 'compliance_reason' not in columns:
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE articles ADD COLUMN compliance_reason TEXT"))
+
+    # Self-healing migration to add 'keywords' and 'search_trends' to generation_plans table
+    columns_gp = [col['name'] for col in inspector.get_columns('generation_plans')]
+    if 'keywords' not in columns_gp:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE generation_plans ADD COLUMN keywords TEXT"))
+    if 'search_trends' not in columns_gp:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE generation_plans ADD COLUMN search_trends TEXT"))
+
 

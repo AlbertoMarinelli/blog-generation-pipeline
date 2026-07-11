@@ -5,7 +5,22 @@ from app.database.models import ArticleModel
 
 class PostPlanner:
 
-    def plan_posts(self, articles: list[ArticleModel], trends: list[dict]) -> list[dict]:
+    def _fetch_google_trends(self, query: str) -> list[str]:
+        try:
+            from pytrends.request import TrendReq
+            # Create request with timeout and generic headers
+            pytrends = TrendReq(hl='en-US', tz=360, timeout=10)
+            pytrends.build_payload(kw_list=[query], timeframe='today 1-m')
+            rq = pytrends.related_queries()
+            if query in rq and rq[query]['top'] is not None:
+                top_df = rq[query]['top']
+                # Extract top 5 related queries
+                return top_df['query'].tolist()[:5]
+        except Exception as e:
+            print(f"Warning: Google Trends query failed for '{query}': {e}.")
+        return []
+
+    def plan_posts(self, articles: list[ArticleModel], trends: list[dict], topic_keywords: dict = None) -> list[dict]:
         if not trends or DAILY_POST_BUDGET <= 0:
             print("No trends available or daily post budget is set to 0. Post planning skipped.")
             return []
@@ -69,5 +84,28 @@ class PostPlanner:
                 ct["allocated_posts"] = allocated_map.get(ct["topic_id"], 0)
         else:
             print("Warning: All active topics have 0% compliance. No posts can be allocated.")
+
+        # 4. Fetch Google Trends search queries only for active topics
+        for ct in calculated_trends:
+            tid = ct["topic_id"]
+            ct["keywords"] = topic_keywords.get(tid, "") if topic_keywords else ""
+            ct["search_trends"] = ""
+
+            if ct["allocated_posts"] > 0:
+                # Take top 1 or 2 keywords from local keywords as seed query
+                keywords_list = [k.strip() for k in ct["keywords"].split(",") if k.strip()]
+                # Using first two words (e.g. "open banking")
+                seed_query = " ".join(keywords_list[:2]) if keywords_list else ct["topic_label"]
+
+                print(f"Fetching Google Trends for topic {tid} ('{seed_query}')...")
+                trends_list = self._fetch_google_trends(seed_query)
+
+                if trends_list:
+                    ct["search_trends"] = ", ".join(trends_list)
+                    print(f"-> Google Trends found: {ct['search_trends']}")
+                else:
+                    print("-> Google Trends unavailable. Falling back directly to local c-TF-IDF keywords.")
+                    # Fallback to local keywords
+                    ct["search_trends"] = ct["keywords"]
 
         return calculated_trends

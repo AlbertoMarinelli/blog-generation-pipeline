@@ -176,7 +176,11 @@ class ArticleRepository:
 
                         topic_label=p["topic_label"],
 
-                        allocated_posts=p["allocated_posts"]
+                        allocated_posts=p["allocated_posts"],
+
+                        keywords=p.get("keywords"),
+
+                        search_trends=p.get("search_trends")
 
                     )
 

@@ -113,15 +113,21 @@ class FintechTopicModeler:
 
         topics, _ = self.model.fit_transform(docs, embeddings=all_embeddings)
 
-        # Extract topic labels (e.g., "0_open_banking_api")
+        # Extract topic labels (e.g., "0_open_banking_api") and top 10 keywords
         topic_labels = {}
+        topic_keywords = {}
         for topic_id, words_weights in self.model.topic_representations_.items():
             if topic_id == -1:
                 topic_labels[topic_id] = "Other / Unclassified"
+                topic_keywords[topic_id] = ""
             else:
-                # Take top 3 keywords
-                top_words = [word for word, _ in words_weights[:3]]
-                topic_labels[topic_id] = f"Topic {topic_id}: " + ", ".join(top_words)
+                # Take top 3 keywords for the label representation
+                top_words_label = [word for word, _ in words_weights[:3]]
+                topic_labels[topic_id] = f"Topic {topic_id}: " + ", ".join(top_words_label)
+
+                # Take top 10 keywords for prompt context
+                top_words_all = [word for word, _ in words_weights[:10]]
+                topic_keywords[topic_id] = ", ".join(top_words_all)
 
         # Ensure directories exist
         self.model_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -133,7 +139,7 @@ class FintechTopicModeler:
         # Save model
         self.save_model()
 
-        return topics, topic_labels
+        return topics, topic_labels, topic_keywords
 
     def save_visualizations(self, num_docs: int):
         if not self.model:

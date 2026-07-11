@@ -87,7 +87,7 @@ def main():
     print("\nStep 8: Discovering topics using BERTopic...")
     modeler = FintechTopicModeler()
     try:
-        topics, topic_labels = modeler.train(all_articles, repository=repository)
+        topics, topic_labels, topic_keywords = modeler.train(all_articles, repository=repository)
         
         # Prepare list of updates to save back to database
         updates = []
@@ -135,7 +135,7 @@ def main():
 
         print("\nStep 11: Generating daily post allocation plan...")
         planner = PostPlanner()
-        plan = planner.plan_posts(all_articles, trends)
+        plan = planner.plan_posts(all_articles, trends, topic_keywords=topic_keywords)
         
         print("Saving daily post allocation plan to SQLite database...")
         repository.save_generation_plan(plan)
@@ -147,8 +147,10 @@ def main():
         print("=" * 60)
         for p in plan:
             if p["allocated_posts"] > 0:
-                print(f"[{p['allocated_posts']:2d} posts] {p['topic_label']} "
-                      f"(Compliance: {int(p['compliance_rate'] * 100)}%, Trend Score: {p['trend_score']:.2f})")
+                print(f"[{p['allocated_posts']:2d} posts] {p['topic_label']}\n"
+                      f"  - Compliance: {int(p['compliance_rate'] * 100)}%, Trend Score: {p['trend_score']:.2f}\n"
+                      f"  - Top c-TF-IDF: {p['keywords']}\n"
+                      f"  - Google Trends: {p['search_trends']}")
         print("=" * 60)
 
     except Exception as e:

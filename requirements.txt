@@ -12,3 +12,4 @@ umap-learn
 hdbscan
 googlenewsdecoder
 xgboost
+pytrends

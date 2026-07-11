@@ -78,4 +78,9 @@ class GenerationPlanModel(Base):
 
     computed_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
 
+    keywords: Mapped[Optional[str]] = mapped_column(nullable=True)
+
+    search_trends: Mapped[Optional[str]] = mapped_column(nullable=True)
+
+
 
