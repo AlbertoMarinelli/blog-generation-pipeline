@@ -1,7 +1,7 @@
 from sqlalchemy import select
 
 from app.database.db import SessionLocal
-from app.database.models import ArticleModel
+from app.database.models import ArticleModel, TopicTrendModel
 
 
 class ArticleRepository:
@@ -77,5 +77,36 @@ class ArticleRepository:
                 if article:
 
                     article.embedding = update["embedding"]
+
+            session.commit()
+
+    def save_topic_trends(self, trends: list[dict]):
+
+        with SessionLocal() as session:
+
+            # Clear old trends to keep it as a fresh snapshot
+            session.query(TopicTrendModel).delete()
+
+            for t in trends:
+
+                session.add(
+
+                    TopicTrendModel(
+
+                        topic_id=t["topic_id"],
+
+                        topic_label=t["topic_label"],
+
+                        volume=t["volume"],
+
+                        freshness_score=t["freshness_score"],
+
+                        source_diversity=t["source_diversity"],
+
+                        trend_score=t["trend_score"]
+
+                    )
+
+                )
 
             session.commit()

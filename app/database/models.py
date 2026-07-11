@@ -35,4 +35,26 @@ class ArticleModel(Base):
 
     topic_label: Mapped[Optional[str]] = mapped_column(nullable=True)
 
-    embedding: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
+    embedding: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
+
+
+class TopicTrendModel(Base):
+
+    __tablename__ = "topic_trends"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    topic_id: Mapped[int]
+
+    topic_label: Mapped[str]
+
+    volume: Mapped[int]
+
+    freshness_score: Mapped[float]
+
+    source_diversity: Mapped[float]
+
+    trend_score: Mapped[float]
+
+    computed_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+

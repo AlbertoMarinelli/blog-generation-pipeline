@@ -10,6 +10,7 @@ from app.preprocessing.deduplicator import Deduplicator
 from app.database.db import init_db
 from app.database.repository import ArticleRepository
 from app.topic_modeling.bertopic_model import FintechTopicModeler
+from app.trend_analysis.scorer import TrendScorer
 
 
 def main():
@@ -63,24 +64,38 @@ def main():
         updates = []
         for i, article in enumerate(all_articles):
             topic_id = int(topics[i])
+            label = topic_labels.get(topic_id, "Unknown")
+            
+            # Mutate Python objects in-place so they can be immediately fed to TrendScorer
+            article.topic_id = topic_id
+            article.topic_label = label
+            
             updates.append({
                 "id": article.id,
                 "topic_id": topic_id,
-                "topic_label": topic_labels.get(topic_id, "Unknown")
+                "topic_label": label
             })
 
         print("\nStep 9: Updating article topics in database...")
         repository.update_article_topics(updates)
         print("Database updated with topic assignments.")
 
-        # Print topics summary
-        topic_counts = Counter(topics)
+        print("\nStep 10: Analyzing and scoring topic trends with XGBoost...")
+        scorer = TrendScorer()
+        trends = scorer.calculate_trends(all_articles)
+        
+        print("Saving topic trends to SQLite database...")
+        repository.save_topic_trends(trends)
+        print("Topic trends saved.")
+
+        # Print trends summary
         print("\n" + "=" * 60)
-        print("DISCOVERED TOPICS SUMMARY")
+        print("TOPIC TRENDS SUMMARY (XGBoost Scored)")
         print("=" * 60)
-        for topic_id, count in topic_counts.most_common():
-            label = topic_labels.get(topic_id, "Other / Unclassified")
-            print(f"[{count:3d} articles] {label}")
+        for t in trends[:10]:
+            print(f"[Score: {t['trend_score']:7.2f}] {t['topic_label']} "
+                  f"(Volume: {t['volume']}, Freshness: {t['freshness_score']:.2f}, "
+                  f"Sources: {int(t['source_diversity'] * t['volume'])}/{t['volume']})")
         print("=" * 60)
 
     except Exception as e:
