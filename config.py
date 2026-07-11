@@ -13,3 +13,10 @@ RSS_FEEDS = [
     "https://news.google.com/rss/search?q=embedded+finance",
     "https://news.google.com/rss/search?q=digital+payments"
 ]
+
+COMPETITOR_BLACKLIST_PATH = DATA_DIR / "competitor_blacklist.txt"
+
+BRAND_IDENTITY_PATH = DATA_DIR / "brand_identity.txt"
+
+COMPLIANCE_SIMILARITY_THRESHOLD = 0.35
+

@@ -25,4 +25,11 @@ def init_db():
     columns = [col['name'] for col in inspector.get_columns('articles')]
     if 'embedding' not in columns:
         with engine.begin() as conn:
-            conn.execute(text("ALTER TABLE articles ADD COLUMN embedding BLOB"))
+            conn.execute(text("ALTER TABLE articles ADD COLUMN embedding BLOB"))
+    if 'is_compliant' not in columns:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE articles ADD COLUMN is_compliant BOOLEAN"))
+    if 'compliance_reason' not in columns:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE articles ADD COLUMN compliance_reason TEXT"))
+

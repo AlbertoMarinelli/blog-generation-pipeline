@@ -37,6 +37,11 @@ class ArticleModel(Base):
 
     embedding: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
 
+    is_compliant: Mapped[Optional[bool]] = mapped_column(nullable=True)
+
+    compliance_reason: Mapped[Optional[str]] = mapped_column(nullable=True)
+
+
 
 class TopicTrendModel(Base):
 

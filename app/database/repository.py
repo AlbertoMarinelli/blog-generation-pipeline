@@ -110,3 +110,39 @@ class ArticleRepository:
                 )
 
             session.commit()
+
+    def get_compliant(self):
+
+        with SessionLocal() as session:
+
+            return session.scalars(
+                select(ArticleModel).where(ArticleModel.is_compliant == True)
+            ).all()
+
+    def get_pending_compliance(self):
+
+        with SessionLocal() as session:
+
+            return session.scalars(
+                select(ArticleModel).where(ArticleModel.is_compliant == None)
+            ).all()
+
+    def update_article_compliance(self, updates: list[dict]):
+
+        with SessionLocal() as session:
+
+            for update in updates:
+
+                article = session.get(ArticleModel, update["id"])
+
+                if article:
+
+                    article.is_compliant = update["is_compliant"]
+
+                    article.compliance_reason = update["compliance_reason"]
+
+                    if "embedding" in update:
+
+                        article.embedding = update["embedding"]
+
+            session.commit()

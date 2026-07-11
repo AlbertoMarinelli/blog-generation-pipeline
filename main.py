@@ -11,6 +11,7 @@ from app.database.db import init_db
 from app.database.repository import ArticleRepository
 from app.topic_modeling.bertopic_model import FintechTopicModeler
 from app.trend_analysis.scorer import TrendScorer
+from app.compliance.compliance_filter import ComplianceFilter
 
 
 def main():
@@ -46,8 +47,17 @@ def main():
     saved = repository.save_many(articles)
     print(f"Saved {saved} new articles to SQLite database.")
 
-    # Retrieve all articles from DB to run BERTopic
-    print("\nStep 7: Retrieving all articles from database...")
+    # Evaluate compliance for pending articles
+    print("\nStep 7a: Evaluating compliance for pending articles...")
+    pending_articles = repository.get_pending_compliance()
+    if pending_articles:
+        comp_filter = ComplianceFilter()
+        comp_filter.evaluate_articles(pending_articles, repository)
+    else:
+        print("No articles pending compliance check.")
+
+    # Retrieve all articles to run BERTopic
+    print("\nStep 7b: Retrieving all articles from database...")
     all_articles = repository.get_all()
     print(f"Total articles in database: {len(all_articles)}")
 
@@ -93,9 +103,15 @@ def main():
         print("TOPIC TRENDS SUMMARY (XGBoost Scored)")
         print("=" * 60)
         for t in trends[:10]:
+            topic_id = t["topic_id"]
+            topic_articles = [a for a in all_articles if a.topic_id == topic_id]
+            total_vol = len(topic_articles)
+            compliant_vol = sum(1 for a in topic_articles if a.is_compliant == True)
+            
             print(f"[Score: {t['trend_score']:7.2f}] {t['topic_label']} "
-                  f"(Volume: {t['volume']}, Freshness: {t['freshness_score']:.2f}, "
-                  f"Sources: {int(t['source_diversity'] * t['volume'])}/{t['volume']})")
+                  f"(Volume: {total_vol}, Compliant: {compliant_vol}/{total_vol}, "
+                  f"Freshness: {t['freshness_score']:.2f}, "
+                  f"Sources: {int(t['source_diversity'] * total_vol)}/{total_vol})")
         print("=" * 60)
 
     except Exception as e:
