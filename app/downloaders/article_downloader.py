@@ -5,13 +5,20 @@ from app.entities.article import Article
 
 
 class ArticleDownloader:
+    """Enriches collected articles by downloading their full text content from direct URLs."""
 
     def process(self, articles: list[Article]) -> list[Article]:
+        """Downloads full text content for the provided list of articles.
 
+        Args:
+            articles (list[Article]): The list of raw articles to download.
+
+        Returns:
+            list[Article]: Enriched articles containing the downloaded full content.
+        """
         enriched_articles = []
 
         for article in articles:
-
             url_to_fetch = article.url
             if "news.google.com" in url_to_fetch:
                 try:
@@ -33,7 +40,6 @@ class ArticleDownloader:
                 continue
 
             article.content = content
-
             enriched_articles.append(article)
 
         return enriched_articles

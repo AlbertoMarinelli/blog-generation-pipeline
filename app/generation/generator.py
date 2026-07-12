@@ -6,16 +6,30 @@ from app.database.models import ArticleModel
 
 
 class BlogGenerator:
+    """Generates SEO-compliant blog posts using either a local mock template or the Google Gemini LLM API."""
 
     def __init__(self):
         self.mock_mode = GEMINI_MOCK_MODE
         self.api_key = GEMINI_API_KEY
         
-        # Inizializza l'ambiente Jinja2 per i template
+        # Initialize the Jinja2 environment for rendering prompt templates
         template_dir = os.path.join(os.path.dirname(__file__), 'templates')
         self.jinja_env = Environment(loader=FileSystemLoader(template_dir))
 
     def generate_post(self, topic_label: str, keywords: str, search_trends: str, rag_articles: list[ArticleModel], feedback: str = None) -> str:
+        """Generates a blog post using Gemini or the fallback mock generator depending on configuration.
+
+        Args:
+            topic_label (str): Label of the selected trend topic.
+            keywords (str): Associated keywords.
+            search_trends (str): Related search queries from Google Trends.
+            rag_articles (list[ArticleModel]): List of referenced source articles.
+            feedback (str, optional): Corrective feedback for auto-correction loops.
+
+        Returns:
+            str: Generated post content in markdown format.
+        """
+        # [DIDACTIC_LIMITATION] Uses a rule-based mock post template if real LLM API keys are not supplied.
         if self.mock_mode:
             return self._generate_mock_post(topic_label, keywords, search_trends, rag_articles, feedback=feedback)
         else:
@@ -93,7 +107,7 @@ In linea con le nostre linee guida di posizionamento sul mercato, promuoviamo so
         # Initialize the official Gemini SDK client
         client = genai.Client(api_key=self.api_key)
 
-        # Carica e renderizza il prompt tramite Jinja2
+        # Load and render prompt configuration using Jinja2 templates
         template = self.jinja_env.get_template('post_generation.jinja')
         user_content = template.render(
             topic_label=topic_label,
@@ -103,7 +117,7 @@ In linea con le nostre linee guida di posizionamento sul mercato, promuoviamo so
             feedback=feedback
         )
 
-        # Carica le istruzioni di sistema dal template
+        # Load system instruction profile from template
         system_instruction_tmpl = self.jinja_env.get_template('system_instruction.jinja')
         system_instruction = system_instruction_tmpl.render()
 

@@ -31,28 +31,28 @@ logger = logging.getLogger(__name__)
 
 
 def init_database():
-    """Inizializza lo schema del database ed effettua eventuali migrazioni."""
-    logger.info("Inizializzazione database in corso...")
+    """Initializes the database schema and performs self-healing database migrations."""
+    logger.info("Initializing database...")
     init_db()
-    logger.info("Database inizializzato con successo.")
+    logger.info("Database initialized successfully.")
 
 
 def run_ingest():
-    """Esegue la fase di raccolta, scaricamento e pulizia degli articoli."""
+    """Executes the data collection, fetching, and text pre-processing stage for new articles."""
     init_database()
-    logger.info("Inizio fase di Ingest degli articoli da feed RSS...")
+    logger.info("Starting article ingestion from RSS feeds...")
 
     collector = RSSCollector(RSS_FEEDS)
     articles = collector.collect()
-    logger.info(f"Raccolti {len(articles)} articoli dai feed RSS.")
+    logger.info(f"Collected {len(articles)} articles from RSS feeds.")
 
     if not articles:
-        logger.warning("Nessun articolo trovato nei feed RSS.")
+        logger.warning("No articles found in RSS feeds.")
         return
 
-    # Prioritizziamo i primi 150 articoli per freschezza
+    # [DIDACTIC_LIMITATION] Slice to the first 150 articles to optimize execution speed in educational demo pipelines.
     articles = articles[:150]
-    logger.info("Decodifica dei link Google News in corso...")
+    logger.info("Decoding Google News links...")
 
     def decode_single(article):
         if "news.google.com" in article.url:
@@ -61,7 +61,7 @@ def run_ingest():
                 if decoded.get("status"):
                     article.url = decoded["decoded_url"]
             except Exception as e:
-                logger.debug(f"Errore durante la decodifica URL {article.url}: {e}")
+                logger.debug(f"Error decoding Google News URL {article.url}: {e}")
         return article
 
     with ThreadPoolExecutor(max_workers=5) as executor:
@@ -69,56 +69,56 @@ def run_ingest():
 
     deduplicator = Deduplicator()
     articles = deduplicator.process(articles)
-    logger.info(f"Trovati {len(articles)} articoli unici dopo la deduplicazione.")
+    logger.info(f"Found {len(articles)} unique articles after deduplication.")
 
     repository = ArticleRepository()
     new_articles = repository.filter_new_articles(articles)
-    logger.info(f"Rilevati {len(new_articles)} nuovi articoli non presenti nel database.")
+    logger.info(f"Identified {len(new_articles)} new articles not currently in the database.")
 
     if new_articles:
-        # Limita a 100 per velocità e stabilità
+        # [DIDACTIC_LIMITATION] Limit newly downloaded articles to 100 to reduce resource usage and run quicker in local tests.
         new_articles = new_articles[:100]
-        logger.info(f"Scaricamento del testo completo per {len(new_articles)} articoli...")
+        logger.info(f"Downloading full text for {len(new_articles)} articles...")
         downloader = ArticleDownloader()
         new_articles = downloader.process(new_articles)
-        logger.info(f"Download completato. Articoli scaricati con successo: {len(new_articles)}.")
+        logger.info(f"Download complete. Successfully fetched: {len(new_articles)}.")
 
-        logger.info("Pulizia del testo e standardizzazione date...")
+        logger.info("Cleaning raw texts and standardizing dates...")
         cleaner = TextCleaner()
         new_articles = cleaner.process(new_articles)
 
-        logger.info("Salvataggio articoli nel database...")
+        logger.info("Saving processed articles to database...")
         saved_count = repository.save_many(new_articles)
-        logger.info(f"Salvati {saved_count} nuovi articoli nel database SQLite.")
+        logger.info(f"Saved {saved_count} new articles into the SQLite database.")
     else:
-        logger.info("Nessun nuovo articolo da scaricare o salvare.")
+        logger.info("No new articles to download or save.")
 
 
 def run_compliance():
-    """Valuta la conformità del brand per tutti gli articoli in stato pendente."""
+    """Evaluates brand compliance checks for all raw articles in a pending state."""
     init_database()
-    logger.info("Inizio fase di Compliance check per articoli pendenti...")
+    logger.info("Starting brand compliance checking for pending articles...")
 
     repository = ArticleRepository()
     pending_articles = repository.get_pending_compliance()
     
     if pending_articles:
-        logger.info(f"Trovati {len(pending_articles)} articoli in attesa di valutazione compliance.")
+        logger.info(f"Found {len(pending_articles)} articles awaiting compliance evaluation.")
         comp_filter = ComplianceFilter()
         comp_filter.evaluate_articles(pending_articles, repository)
     else:
-        logger.info("Nessun articolo pendente da verificare.")
+        logger.info("No pending articles to verify.")
 
 
 def run_classify_new_articles():
-    """Classifica gli articoli conformi appena inseriti usando il modello BERTopic esistente."""
+    """Classifies compliant articles that lack topic assignments using the pre-existing BERTopic model."""
     init_database()
-    logger.info("Avvio classificazione automatica nuovi articoli con modello esistente...")
+    logger.info("Starting automatic classification of new articles using existing topic model...")
     
     article_repo = ArticleRepository()
     topic_repo = TopicRepository()
     
-    # 1. Recupera gli articoli conformi senza topic assegnato
+    # 1. Retrieve compliant articles that do not have any topic ID assigned yet
     from app.database.db import SessionLocal
     from app.database.models import ArticleModel
     from sqlalchemy import select
@@ -132,20 +132,20 @@ def run_classify_new_articles():
         ).all()
         
     if not pending_articles:
-        logger.info("Nessun nuovo articolo conforme da classificare.")
+        logger.info("No new compliant articles to classify.")
         return
         
-    logger.info(f"Trovati {len(pending_articles)} articoli conformi senza topic.")
+    logger.info(f"Found {len(pending_articles)} compliant articles without a topic assignment.")
     
-    # 2. Carica la mappa dei topic attivi
+    # 2. Load the map of currently active database topics
     active_topics_map = topic_repo.get_active_topics_map()
     active_labels_map = topic_repo.get_active_topic_labels_map()
     
     if not active_topics_map:
-        logger.warning("Nessun topic attivo registrato nel database. Esegui prima la fase di addestramento 'analyze'.")
+        logger.warning("No active topics found in the database. Run the 'analyze' stage first to discover topics.")
         return
         
-    # 3. Esegui la classificazione dei testi con BERTopic
+    # 3. Predict topic IDs using the pre-trained BERTopic model
     modeler = FintechTopicModeler()
     texts = []
     for a in pending_articles:
@@ -161,9 +161,9 @@ def run_classify_new_articles():
     for i, a in enumerate(pending_articles):
         pred_bt_id = predicted_bertopic_ids[i]
         
-        # Mappa il BERTopic ID all'ID primario del database
+        # Map the predicted BERTopic cluster ID to the primary database topic ID
         db_topic_id = active_topics_map.get(pred_bt_id)
-        # Se non trovato, proviamo a metterlo in 'Other / Unclassified' (solitamente -1)
+        # Default to 'Other / Unclassified' if no matching cluster is found (usually index -1)
         if db_topic_id is None:
             db_topic_id = active_topics_map.get(-1)
             
@@ -175,33 +175,34 @@ def run_classify_new_articles():
             "topic_label": label
         })
         
-    logger.info(f"Salvataggio delle predizioni dei topic per {len(updates)} articoli...")
+    logger.info(f"Saving predicted topic assignments for {len(updates)} articles...")
     article_repo.update_article_topics(updates)
 
 
 def run_analyze():
-    """Esegue topic modeling BERTopic, scoring dei trend XGBoost e pianificazione dei post."""
+    """Runs BERTopic clustering, XGBoost trend scoring, and schedules daily generation allocations."""
     init_database()
-    logger.info("Inizio fase di Analisi dei Trend e Topic Modeling...")
+    logger.info("Starting topic analysis, trend scoring, and post planning...")
 
     article_repo = ArticleRepository()
     trend_repo = TopicTrendRepository()
     plan_repo = GenerationPlanRepository()
 
-    # Recupera solo gli articoli recenti delle ultime 2 settimane (con fallback a minimo 100 articoli)
+    # [DIDACTIC_LIMITATION] Restrict training query to a sliding window of the last 14 days, falling back to a minimum of 100 articles
+    # to guarantee sufficient dataset size for BERTopic clustering within sandboxed classroom setups.
     all_articles = article_repo.get_articles_for_training(days=14, min_count=100)
-    logger.info(f"Recuperati {len(all_articles)} articoli (finestra mobile 14gg o fallback) dal database per l'analisi.")
+    logger.info(f"Retrieved {len(all_articles)} articles (14-day window or fallback) from database for analysis.")
 
     if not all_articles:
-        logger.warning("Nessun articolo presente nel database. Topic modeling interrotto.")
+        logger.warning("No articles available in database. Aborting topic modeling.")
         return
 
-    logger.info("Esecuzione BERTopic per la scoperta e classificazione dei topic...")
+    logger.info("Running BERTopic discovery and topic assignment...")
     modeler = FintechTopicModeler()
     try:
         topics, topic_labels, topic_keywords = modeler.train(all_articles, repository=article_repo)
         
-        # Prepara i dati dei topic scoperti da salvare storicamente
+        # Prepare discovered topics list for historical snapshot records
         discovered_topics = []
         for topic_id, label in topic_labels.items():
             discovered_topics.append({
@@ -219,7 +220,7 @@ def run_analyze():
             db_id = bertopic_to_db_map.get(bt_id)
             label = topic_labels.get(bt_id, "Unknown")
             
-            # Mutazione in-place per l'analisi successiva del trend scorer
+            # In-place model mutation for subsequent trend analysis scoring
             article.topic_id = db_id
             article.topic_label = label
             
@@ -229,18 +230,18 @@ def run_analyze():
                 "topic_label": label
             })
 
-        logger.info("Aggiornamento dei topic assegnati agli articoli nel database...")
+        logger.info("Updating topic assignments for database articles...")
         article_repo.update_article_topics(updates)
 
-        logger.info("Calcolo ed elaborazione del punteggio dei trend con XGBoost...")
+        logger.info("Calculating topic trends using XGBoost panel regression...")
         scorer = TrendScorer()
         trends = scorer.calculate_trends(all_articles)
         
-        logger.info("Salvataggio dei trend aggiornati nel database...")
+        logger.info("Saving fresh trend scores to the database...")
         trend_repo.save_topic_trends(trends)
 
-        # Log dei trend rilevati
-        logger.info("=== SUMMARY DEI TOPIC TRENDS (Primi 10) ===")
+        # Log identified trends
+        logger.info("=== SUMMARY OF TOPIC TRENDS (Top 10) ===")
         for t in trends[:10]:
             topic_id = t["topic_id"]
             topic_articles = [a for a in all_articles if a.topic_id == topic_id]
@@ -254,9 +255,9 @@ def run_analyze():
             )
         logger.info("==========================================")
 
-        logger.info("Generazione del piano di allocazione post giornaliero...")
+        logger.info("Generating daily post budget allocation plan...")
         planner = PostPlanner()
-        # Mappa le keywords usando l'ID di database del topic invece del BERTopic ID
+        # Map topic keywords using database primary IDs instead of BERTopic cluster IDs
         db_topic_keywords = {
             bertopic_to_db_map[bt_id]: kw
             for bt_id, kw in topic_keywords.items()
@@ -264,52 +265,52 @@ def run_analyze():
         }
         plan = planner.plan_posts(all_articles, trends, topic_keywords=db_topic_keywords)
         
-        logger.info("Salvataggio del piano di generazione nel database...")
+        logger.info("Saving daily post generation plan to database...")
         plan_repo.save_generation_plan(plan)
 
-        logger.info("=== PIANO DI ALLOCAZIONE POST GIORNALIERO ===")
+        logger.info("=== DAILY POST ALLOCATION PLAN ===")
         for p in plan:
             if p["allocated_posts"] > 0:
                 logger.info(
-                    f"[{p['allocated_posts']:2d} post] {p['topic_label']} | "
+                    f"[{p['allocated_posts']:2d} posts] {p['topic_label']} | "
                     f"Trend Score: {p['trend_score']:.2f} | "
                     f"Compliance: {int(p['compliance_rate'] * 100)}%"
                 )
-        logger.info("=============================================")
+        logger.info("====================================")
 
     except Exception as e:
-        logger.exception(f"Errore critico durante la fase di analisi e topic modeling: {e}")
+        logger.exception(f"Critical error during analysis and topic modeling: {e}")
 
 
 def run_generate():
-    """Esegue la generazione dei post tramite RAG basandosi sul piano salvato nel database."""
+    """Generates blog articles using RAG and Gemini based on the active plan in the database."""
     init_database()
-    logger.info("Inizio fase di Generazione Post tramite RAG...")
+    logger.info("Starting blog post generation stage via RAG...")
 
-    # Assicura che la directory di output esista
+    # Ensure output directory exists
     posts_dir = Path("data/posts")
     posts_dir.mkdir(parents=True, exist_ok=True)
 
-    # Pulizia vecchi post per evitare sovrapposizioni
+    # Clean up old posts to avoid overlapping/duplicate files
     for f in posts_dir.glob("*.md"):
         try:
             f.unlink()
         except OSError as e:
-            logger.warning(f"Impossibile rimuovere il file {f}: {e}")
+            logger.warning(f"Could not remove old file {f}: {e}")
 
     article_repo = ArticleRepository()
     plan_repo = GenerationPlanRepository()
     generator = BlogGenerator()
 
-    # Query piani attivi
+    # Query active plans
     plans = plan_repo.get_active_plans()
 
     if not plans:
-        logger.warning("Nessun piano di generazione attivo trovato nel database. Esegui prima la fase 'analyze'.")
+        logger.warning("No active generation plans found. Run the 'analyze' command first.")
         return
 
-    # Carica il modello SentenceTransformer dal singleton service
-    logger.info("Recupero del SentenceTransformer condiviso per codifica query RAG...")
+    # Retrieve the shared SentenceTransformer singleton model for embedding RAG queries
+    logger.info("Retrieving shared SentenceTransformer instance for encoding RAG queries...")
     encoder = get_embedding_model()
 
     total_generated = 0
@@ -321,14 +322,14 @@ def run_generate():
         keywords = plan.keywords if plan.keywords else ""
         search_trends = plan.search_trends if plan.search_trends else ""
 
-        logger.info(f"Elaborazione Topic {topic_id}: '{topic_label}' (Post da generare: {budget})")
+        logger.info(f"Processing Topic {topic_id}: '{topic_label}' (Posts to generate: {budget})")
 
-        # Recupera articoli utilizzabili (compliant e non ancora usati)
+        # Retrieve compliant, unused articles for RAG context
         unused_articles = article_repo.get_unused_compliant_by_topic(topic_id)
         
         retrieved_all = []
         if unused_articles:
-            # Costruisce l'indice FAISS in memoria al volo
+            # Build the FAISS vector index in-memory on the fly
             retriever = RAGRetriever()
             built = retriever.build_index(unused_articles)
 
@@ -336,20 +337,20 @@ def run_generate():
                 keywords_list = [k.strip() for k in keywords.split(",") if k.strip()]
                 seed_query = " ".join(keywords_list[:2]) if keywords_list else topic_label
                 
-                # Calcola il vettore della query
+                # Encode the query text
                 query_vector = encoder.encode(seed_query, convert_to_numpy=True)
                 
-                # Estrae 3 fonti per ogni post pianificato
+                # Retrieve 3 source articles for each planned post allocation
                 k_total = 3 * budget
                 retrieved_all = retriever.retrieve(query_vector, k=k_total)
 
-        # Raggruppa gli articoli per chunk da 3
+        # Group retrieved articles into chunk lists of 3 sources each
         chunks = [retrieved_all[i : i + 3] for i in range(0, len(retrieved_all), 3)]
 
         post_repo = GeneratedPostRepository()
         seo_checker = SEOQualityChecker()
 
-        # Carica gli embedding esistenti per il confronto
+        # Load existing post embeddings to check for semantic duplication
         past_posts = post_repo.get_all_embeddings()
         past_embeddings = [np.frombuffer(p[1], dtype=np.float32) for p in past_posts]
 
@@ -363,7 +364,7 @@ def run_generate():
                 rag_articles=post_articles
             )
 
-            # Estrai slug e titolo dal Front Matter
+            # Extract slug and title attributes from the YAML Front Matter
             slug_match = re.search(r"^slug:\s*(.+)$", post_content, re.MULTILINE)
             slug = slug_match.group(1).strip("'\" ") if slug_match else f"topic-{topic_id}-post-{post_idx}"
             url = f"/blog/{slug}"
@@ -371,17 +372,17 @@ def run_generate():
             title_match = re.search(r"^title:\s*(.+)$", post_content, re.MULTILINE)
             title = title_match.group(1).strip("'\" ") if title_match else f"Post {topic_label}"
 
-            # Valutazione SEO iniziale
+            # Initial SEO evaluation
             seo_res = seo_checker.check_seo(post_content, keywords)
             seo_score = seo_res["score"]
 
-            # Auto-correzione: se il punteggio SEO è inferiore a 60, tenta un secondo invio correttivo
+            # Auto-correction: if SEO score is below threshold, trigger a second correction pass
             if seo_score < 60.0:
-                logger.warning(f"  [Post {post_idx}/{budget}] Punteggio SEO insufficiente ({seo_score}/100). Tentativo di auto-correzione...")
+                logger.warning(f"  [Post {post_idx}/{budget}] Insufficient SEO score ({seo_score}/100). Triggering auto-correction pass...")
                 feedback = (
-                    f"Il testo precedente ha ottenuto un punteggio SEO insufficiente ({seo_score}/100) per i seguenti motivi:\n"
+                    f"The generated content failed the SEO requirements ({seo_score}/100) due to:\n"
                     + "\n".join([f"- {w}" for w in seo_res["warnings"]])
-                    + "\nPer favore riscrivi l'articolo assicurandoti di espanderlo (minimo 500 parole), strutturare bene gli heading H1 (# ), H2 (## ), H3 (### ) ed inserire in modo naturale le parole chiave."
+                    + "\nPlease rewrite the article ensuring you extend the length (min 500 words), structure headings properly (H1, H2, H3), and use keywords naturally."
                 )
                 post_content = generator.generate_post(
                     topic_label=topic_label,
@@ -391,11 +392,11 @@ def run_generate():
                     feedback=feedback
                 )
                 
-                # Rivalutazione SEO post-correzione
+                # Evaluate updated SEO score
                 seo_res = seo_checker.check_seo(post_content, keywords)
                 seo_score = seo_res["score"]
                 
-                # Riestrai titolo e slug corretti se cambiati
+                # Re-extract correct title and slug
                 slug_match = re.search(r"^slug:\s*(.+)$", post_content, re.MULTILINE)
                 if slug_match:
                     slug = slug_match.group(1).strip("'\" ")
@@ -404,27 +405,27 @@ def run_generate():
                 if title_match:
                     title = title_match.group(1).strip("'\" ")
 
-            # Calcolo embedding del post
+            # Calculate post embedding
             new_emb = encoder.encode(post_content, convert_to_numpy=True)
             
-            # Controllo duplicati semantici
+            # Check for semantic similarity duplicates
             max_sim = seo_checker.check_similarity(new_emb, past_embeddings)
             if max_sim > 0.92:
-                logger.warning(f"  [Post {post_idx}/{budget}] ALTA SIMILARITÀ rilevata ({max_sim:.2%}) con post storici. Possibile duplicato!")
+                logger.warning(f"  [Post {post_idx}/{budget}] HIGH SEMANTIC SIMILARITY detected ({max_sim:.2%}) with prior posts. Possible duplicate!")
 
-            # Cerca ed aggancia post correlati già pubblicati
+            # Search and append recommended internal link recommendations
             from app.services.published_index import PublishedPostsIndex
             pub_index = PublishedPostsIndex()
             related_ids = pub_index.search_similar_posts(new_emb, k=2)
             related_posts = post_repo.get_posts_by_ids(related_ids)
             if related_posts:
-                references_md = "\n\n### Articoli Consigliati\n"
+                references_md = "\n\n### Recommended Articles\n"
                 for rp in related_posts:
                     references_md += f"* [{rp.title}]({rp.url})\n"
                 post_content += references_md
-                logger.info(f"  [Post {post_idx}/{budget}] Agganciati {len(related_posts)} articoli correlati come reference in coda.")
+                logger.info(f"  [Post {post_idx}/{budget}] Attached {len(related_posts)} related posts as footer recommendations.")
 
-            # Salvataggio nel database
+            # Save generated post to database
             needs_review_flag = seo_score < 60.0
             post_repo.save_post(
                 topic_id=topic_id,
@@ -437,45 +438,45 @@ def run_generate():
                 needs_review=needs_review_flag
             )
 
-            # Aggiungi il nuovo embedding alla lista per i confronti successivi nello stesso batch
+            # Append the new embedding to prevent similarity collisions inside the same execution batch
             past_embeddings.append(new_emb)
 
-            # Salvataggio su file markdown
+            # Save generated content to a local markdown file
             filename = f"topic_{topic_id}_post_{post_idx}.md"
             filepath = posts_dir / filename
             filepath.write_text(post_content, encoding="utf-8")
 
             is_rag = "RAG" if post_articles else "NO-RAG"
-            review_status = " [NECESSITA REVISIONE]" if needs_review_flag else ""
+            review_status = " [NEEDS REVIEW]" if needs_review_flag else ""
             logger.info(
-                f"  [Post {post_idx}/{budget}] Generato '{filename}' ({is_rag} mode, "
+                f"  [Post {post_idx}/{budget}] Generated '{filename}' ({is_rag} mode, "
                 f"SEO Score: {seo_score}/100, Max Similarity: {max_sim:.2%}){review_status}"
             )
             total_generated += 1
 
-        # Aggiorna gli articoli come usati
+        # Mark source articles as used in the database
         if retrieved_all:
             used_ids = [art.id for art in retrieved_all]
             article_repo.mark_articles_as_used(used_ids)
-            logger.info(f"  Marcati {len(used_ids)} articoli come utilizzati nel database.")
+            logger.info(f"  Marked {len(used_ids)} source articles as used in database.")
 
-    logger.info(f"Generazione completata con successo! Creati {total_generated} post in: {posts_dir.resolve()}")
+    logger.info(f"Generation workflow completed successfully! Created {total_generated} post files in: {posts_dir.resolve()}")
 
 
 def run_all():
-    """Esegue l'intero flusso sequenzialmente in un unico ciclo."""
-    logger.info("=== AVVIO PIPELINE END-TO-END ===")
+    """Runs all pipeline phases end-to-end sequentially."""
+    logger.info("=== STARTING END-TO-END PIPELINE ===")
     run_ingest()
     run_compliance()
     run_analyze()
     run_generate()
-    logger.info("=== PIPELINE COMPLETATA CON SUCCESSO ===")
+    logger.info("=== PIPELINE RUN COMPLETE ===")
 
 
 def run_build_index():
-    """Costruisce o aggiorna l'indice vettoriale dei post già pubblicati."""
+    """Builds or updates the vector similarity index of published blog posts."""
     init_database()
-    logger.info("Inizio indicizzazione vettoriale dei post pubblicati...")
+    logger.info("Starting index build of published posts...")
     from app.services.published_index import PublishedPostsIndex
     indexer = PublishedPostsIndex()
     indexer.build_index_from_db()

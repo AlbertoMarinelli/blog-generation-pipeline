@@ -7,14 +7,21 @@ from app.services.embedding import get_embedding_model
 
 
 class ComplianceFilter:
+    """Evaluates whether crawled articles align with brand identity guidelines and avoid competitors."""
 
     def __init__(self):
         self._brand_embedding = None
 
     def _get_encoder(self):
+        """Helper to retrieve the shared embedding model."""
         return get_embedding_model()
 
     def _get_brand_embedding(self) -> np.ndarray:
+        """Retrieves or computes the brand identity embedding vector.
+
+        Returns:
+            np.ndarray: The embedding vector representing the brand identity guidelines.
+        """
         if self._brand_embedding is None:
             # Read Brand Identity text
             try:
@@ -22,6 +29,7 @@ class ComplianceFilter:
                     text = f.read().strip()
             except Exception as e:
                 print(f"Warning: could not read brand_identity.txt from {BRAND_IDENTITY_PATH}: {e}. Using fallback.")
+                # [DIDACTIC_LIMITATION] Fallback brand description used to ensure compliance filter runs without dependency on external txt configuration.
                 text = "Open banking, financial APIs, digital payments, B2B fintech SaaS."
 
             if not text:
@@ -33,6 +41,17 @@ class ComplianceFilter:
         return self._brand_embedding
 
     def evaluate_articles(self, articles: list[ArticleModel], repository) -> list[dict]:
+        """Evaluates compliance for a batch of articles against blacklists and brand guidelines.
+
+        Updates the database with compliance status and computed article embeddings.
+
+        Args:
+            articles (list[ArticleModel]): The database article models to check.
+            repository (ArticleRepository): Repository class to persist results.
+
+        Returns:
+            list[dict]: List of update dictionaries with compliance status.
+        """
         if not articles:
             return []
 
@@ -55,7 +74,7 @@ class ComplianceFilter:
         ]
 
         for a in articles:
-            # Combine content for analysis
+            # Combine title, summary, and content for analysis
             title = a.title or ""
             summary = a.summary or ""
             content = a.content or ""
@@ -79,24 +98,24 @@ class ComplianceFilter:
                 continue
 
             # 2. Semantic Similarity Check
-            # Re-use cached embedding if available
+            # Reuse cached embedding if already computed
             if a.embedding is not None:
                 emb = np.frombuffer(a.embedding, dtype=np.float32)
                 emb_bytes = a.embedding
             else:
-                # Compute embedding
+                # Compute embedding on-the-fly
                 text_to_encode = combined_text if combined_text else "Empty article"
                 encoder = self._get_encoder()
                 emb = encoder.encode(text_to_encode, convert_to_numpy=True)
                 emb_bytes = emb.astype(np.float32).tobytes()
 
-            # Cosine similarity
+            # Compute cosine similarity
             dot_product = np.dot(emb, brand_emb)
             norm_emb = np.linalg.norm(emb)
             norm_brand = np.linalg.norm(brand_emb)
             similarity = float(dot_product / (norm_emb * norm_brand)) if norm_emb > 0 and norm_brand > 0 else 0.0
 
-            # Determine compliance status
+            # Determine compliance status based on threshold limit
             if similarity >= COMPLIANCE_SIMILARITY_THRESHOLD:
                 updates.append({
                     "id": a.id,
@@ -113,10 +132,9 @@ class ComplianceFilter:
                 })
 
         if updates:
-            # Batch update the database
+            # Persist results in batch database transaction
             repository.update_article_compliance(updates)
             
-            # Print a quick summary of the results
             reasons = [u["compliance_reason"] for u in updates]
             print(f"Compliance evaluation finished. "
                   f"Compliant: {reasons.count('compliant')}, "

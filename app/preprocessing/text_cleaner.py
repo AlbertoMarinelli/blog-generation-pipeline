@@ -8,8 +8,17 @@ from app.entities.article import Article
 
 
 class TextCleaner:
+    """Pre-processing module that cleans raw text content and parses publication dates."""
 
     def clean_text(self, text: str) -> str:
+        """Cleans unicode representations, strips HTML tags, and standardizes whitespace in text.
+
+        Args:
+            text (str): The raw input text.
+
+        Returns:
+            str: The cleaned and normalized text.
+        """
         if not text:
             return ""
 
@@ -29,6 +38,14 @@ class TextCleaner:
         return text.strip()
 
     def parse_date(self, raw_date: str) -> str:
+        """Parses raw date string into a standardized date format (%Y-%m-%d %H:%M:%S).
+
+        Args:
+            raw_date (str): The raw string representation of a date.
+
+        Returns:
+            str: Standardized UTC date string.
+        """
         if not raw_date:
             return datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -42,6 +59,14 @@ class TextCleaner:
         return raw_date
 
     def process(self, articles: list[Article]) -> list[Article]:
+        """Cleans textual attributes (title, summary, content) and parses dates for a list of articles.
+
+        Args:
+            articles (list[Article]): The list of raw articles to clean.
+
+        Returns:
+            list[Article]: Cleaned and processed articles.
+        """
         for article in articles:
             article.title = self.clean_text(article.title)
             article.summary = self.clean_text(article.summary)

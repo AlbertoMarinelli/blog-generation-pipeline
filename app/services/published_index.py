@@ -8,16 +8,19 @@ from app.database.models import GeneratedPostModel
 INDEX_PATH = "data/published_posts.index"
 
 class PublishedPostsIndex:
+    """Manages the FAISS vector index of published blog posts to support related post queries."""
+
     def __init__(self, session_factory=None):
         self.session_factory = session_factory or SessionLocal
 
     def build_index_from_db(self) -> int:
-        """
-        Estrarre tutti i post con is_published = 1 dal database, genera l'indice FAISS
-        e lo scrive su disco. Ritorna il numero di post indicizzati.
+        """Extracts all published posts from the database, builds the FAISS index, and saves it to disk.
+
+        Returns:
+            int: The number of indexed posts.
         """
         with self.session_factory() as session:
-            # Query post pubblicati con embedding non nullo
+            # Query published posts with non-null embeddings
             posts = session.scalars(
                 select(GeneratedPostModel).where(
                     GeneratedPostModel.is_published == True,
@@ -26,8 +29,8 @@ class PublishedPostsIndex:
             ).all()
 
             if not posts:
-                print("Nessun post pubblicato trovato nel database per l'indicizzazione.")
-                # Se l'indice esiste, rimuovilo per consistenza
+                print("No published posts found in the database for indexing.")
+                # If the index file exists, remove it for consistency
                 if os.path.exists(INDEX_PATH):
                     try:
                         os.remove(INDEX_PATH)
@@ -35,11 +38,11 @@ class PublishedPostsIndex:
                         pass
                 return 0
 
-            # Estrai ed analizza il primo embedding per determinare la dimensione dinamicamente
+            # Extract and inspect the first embedding to determine vector dimension dynamically
             first_emb = np.frombuffer(posts[0].embedding, dtype=np.float32)
             dimension = len(first_emb)
 
-            # Crea un indice FAISS IndexIDMap2 con IndexFlatIP (Inner Product per cosine similarity su vettori normalizzati)
+            # Create a FAISS IndexIDMap2 with IndexFlatIP (Inner Product cosine similarity on normalized vectors)
             flat_index = faiss.IndexFlatIP(dimension)
             index = faiss.IndexIDMap2(flat_index)
 
@@ -48,7 +51,7 @@ class PublishedPostsIndex:
 
             for p in posts:
                 emb = np.frombuffer(p.embedding, dtype=np.float32)
-                # Normalizzazione per garantire che l'Inner Product calcoli la cosine similarity
+                # Normalize embeddings to ensure Inner Product calculates cosine similarity
                 norm = np.linalg.norm(emb)
                 if norm > 0:
                     emb = emb / norm
@@ -58,39 +61,44 @@ class PublishedPostsIndex:
             embeddings_np = np.stack(embeddings_list).astype(np.float32)
             ids_np = np.array(ids_list, dtype=np.int64)
 
-            # Aggiunge i vettori associandoli agli ID del DB
+            # Add vectors mapped to database primary IDs
             index.add_with_ids(embeddings_np, ids_np)
 
-            # Salva l'indice su disco
+            # Save the index to disk
             os.makedirs(os.path.dirname(INDEX_PATH), exist_ok=True)
             faiss.write_index(index, INDEX_PATH)
-            print(f"Indice FAISS costruito ed esportato con successo in '{INDEX_PATH}' ({len(posts)} post indicizzati).")
+            print(f"FAISS index built and exported successfully to '{INDEX_PATH}' ({len(posts)} posts indexed).")
             return len(posts)
 
     def search_similar_posts(self, query_embedding: np.ndarray, k: int = 2) -> list[int]:
-        """
-        Cerca nell'indice i k post più simili al vettore fornito.
-        Ritorna una lista di ID primari del database dei post correlati.
+        """Queries the vector index for the k most similar published posts.
+
+        Args:
+            query_embedding (np.ndarray): The query vector.
+            k (int): Maximum number of recommendations to retrieve.
+
+        Returns:
+            list[int]: List of primary database IDs for matching posts.
         """
         if not os.path.exists(INDEX_PATH):
             return []
 
         try:
-            # Carica l'indice da disco
+            # Load the index from disk
             index = faiss.read_index(INDEX_PATH)
         except Exception as e:
-            print(f"Errore nel caricamento dell'indice FAISS da disco: {e}")
+            print(f"Error loading FAISS index from disk: {e}")
             return []
 
-        # Normalizza il vettore di query per cosine similarity
+        # Normalize query vector for cosine similarity
         query_norm = np.linalg.norm(query_embedding)
         if query_norm == 0:
             return []
         q_vec = (query_embedding / query_norm).reshape(1, -1).astype(np.float32)
 
-        # Cerca nell'indice
+        # Search the index
         distances, indices = index.search(q_vec, k)
 
-        # Ritorna gli ID validi (esclude -1 che rappresenta nessun match)
+        # Return valid IDs, filtering out -1 (no match indicator)
         matched_ids = [int(idx) for idx in indices[0] if idx != -1]
         return matched_ids

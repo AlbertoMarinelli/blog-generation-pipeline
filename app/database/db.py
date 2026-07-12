@@ -6,7 +6,7 @@ from config import DATABASE_PATH
 from app.database.models import Base
 
 
-# Carica DATABASE_URL dall'ambiente se presente, altrimenti ripiega su SQLite locale
+# Load DATABASE_URL from environment if present, otherwise fallback to local SQLite
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DATABASE_PATH}")
 
 engine = create_engine(
@@ -21,7 +21,7 @@ SessionLocal = sessionmaker(
 
 
 def init_db():
-
+    """Initializes the database schema and performs self-healing schema migrations."""
     Base.metadata.create_all(engine)
 
     # Self-healing migration to add 'embedding' column if it does not exist

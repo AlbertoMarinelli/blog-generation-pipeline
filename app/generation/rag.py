@@ -4,12 +4,21 @@ from app.database.models import ArticleModel
 
 
 class RAGRetriever:
+    """Handles in-memory FAISS indexing and vector retrieval of articles for RAG-augmented generation."""
 
     def __init__(self):
         self.index = None
         self.article_mapping = []
 
     def build_index(self, articles: list[ArticleModel]) -> bool:
+        """Constructs an in-memory FAISS L2 Inner Product index for the provided articles.
+
+        Args:
+            articles (list[ArticleModel]): List of articles to index.
+
+        Returns:
+            bool: True if index was successfully built, False otherwise.
+        """
         if not articles:
             self.index = None
             self.article_mapping = []
@@ -50,6 +59,15 @@ class RAGRetriever:
         return True
 
     def retrieve(self, query_vector: np.ndarray, k: int = 3) -> list[ArticleModel]:
+        """Retrieves the top k most relevant articles matching the query vector.
+
+        Args:
+            query_vector (np.ndarray): The query embedding.
+            k (int): Number of articles to retrieve.
+
+        Returns:
+            list[ArticleModel]: List of top relevant articles.
+        """
         if self.index is None or self.index.ntotal == 0:
             return []
 

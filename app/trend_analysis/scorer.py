@@ -6,8 +6,17 @@ from app.database.models import ArticleModel
 
 
 class TrendScorer:
+    """Computes trend scores for identified topics using an XGBoost panel regression model or rules-based fallbacks."""
 
     def calculate_trends(self, articles: list[ArticleModel]) -> list[dict]:
+        """Calculates trend scores for active topics based on article volumes, freshness, and diversity.
+
+        Args:
+            articles (list[ArticleModel]): The list of topic-assigned articles to analyze.
+
+        Returns:
+            list[dict]: A sorted list of trend dictionaries, ordered by trend score descending.
+        """
         # Filter out articles with no topic or unclassified (-1)
         valid_articles = [
             a for a in articles 

@@ -17,35 +17,35 @@ logger = logging.getLogger("blog_pipeline")
 
 @task(name="Ingestion RSS")
 def ingest_task():
-    logger.info("Avvio ingestion RSS...")
+    logger.info("Starting RSS ingestion...")
     run_ingest()
 
 
 @task(name="Compliance Check")
 def compliance_task():
-    logger.info("Avvio controlli di compliance...")
+    logger.info("Starting compliance checks...")
     run_compliance()
 
 
 @task(name="Classificazione Nuovi Articoli")
 def classify_task():
-    logger.info("Avvio classificazione automatica su topic esistenti...")
+    logger.info("Starting automatic classification on existing topics...")
     run_classify_new_articles()
 
 
 @task(name="Trend Analysis & Planning")
 def analyze_task():
-    logger.info("Avvio topic modeling (BERTopic) e analisi dei trend (XGBoost)...")
+    logger.info("Starting topic modeling (BERTopic) and trend analysis (XGBoost)...")
     run_analyze()
 
 
 @task(name="Post Generation (RAG)")
 def generate_task():
-    logger.info("Avvio generazione post giornalieri tramite RAG e LLM...")
+    logger.info("Starting daily post generation using RAG and LLM...")
     run_generate()
 
 
-# 1. Pipeline Giornaliera: Raccolta Dati, Compliance e Classificazione
+# 1. Daily Pipeline: Ingestion, Compliance, and Classification
 @flow(name="Daily Ingestion and Compliance Pipeline")
 def daily_ingest_compliance_flow():
     ingest_task()
@@ -53,55 +53,55 @@ def daily_ingest_compliance_flow():
     classify_task()
 
 
-# 2. Pipeline Settimanale: Addestramento Modello, Storicizzazione e Trend Analysis
+# 2. Weekly Pipeline: Model Training, Historical Records, and Trend Analysis
 @flow(name="Weekly Topic Analysis Pipeline")
 def weekly_analysis_flow():
     analyze_task()
 
 
-# 3. Pipeline Giornaliera: Generazione Post Blog
+# 3. Daily Pipeline: Blog Post Generation
 @flow(name="Daily Post Generation Pipeline")
 def daily_generation_flow():
     generate_task()
 
 
-# 4. Pipeline Demo: Esegue tutto in sequenza per scopi di debug/valutazione
+# 4. Demo Pipeline: Run all phases in sequence for debugging/evaluation
 @flow(name="Demo End-to-End Pipeline")
 def demo_pipeline():
-    logger.info("--- [DEMO E2E] Fase 1: Ingest, Compliance & Classificazione ---")
+    logger.info("--- [DEMO E2E] Phase 1: Ingest, Compliance & Classification ---")
     ingest_task()
     compliance_task()
     
-    logger.info("--- [DEMO E2E] Fase 2: Analisi Settimanale (Re-clustering & Trend Analysis) ---")
+    logger.info("--- [DEMO E2E] Phase 2: Weekly Analysis (Re-clustering & Trend Analysis) ---")
     analyze_task()
     
-    logger.info("--- [DEMO E2E] Fase 3: Generazione Giornaliera Post ---")
+    logger.info("--- [DEMO E2E] Phase 3: Daily Post Generation ---")
     generate_task()
 
 
 def serve_scheduled_flows():
-    """Configura e serve le tre pipeline con pianificazione stile produzione."""
-    logger.info("Configurazione dei deployment schedulati per le pipeline...")
+    """Configures and runs the three pipelines using a production-grade scheduler."""
+    logger.info("Configuring scheduled deployments for pipelines...")
     
-    # 1. Ingestion e Compliance: ogni giorno alle 01:00
+    # 1. Ingestion and Compliance: daily at 01:00 Europe/Rome
     dep_ingest = daily_ingest_compliance_flow.to_deployment(
         name="daily-ingest-compliance",
         schedule=CronSchedule(cron="0 1 * * *", timezone="Europe/Rome")
     )
     
-    # 2. Analisi topic e trend: ogni lunedì alle 02:00
+    # 2. Topic and Trend analysis: weekly on Monday at 02:00 Europe/Rome
     dep_analysis = weekly_analysis_flow.to_deployment(
         name="weekly-topic-analysis",
         schedule=CronSchedule(cron="0 2 * * 1", timezone="Europe/Rome")
     )
     
-    # 3. Generazione post: ogni giorno alle 06:00
+    # 3. Blog post generation: daily at 06:00 Europe/Rome
     dep_generate = daily_generation_flow.to_deployment(
         name="daily-generation",
         schedule=CronSchedule(cron="0 6 * * *", timezone="Europe/Rome")
     )
     
-    logger.info("Avvio del server di orchestrazione Prefect (Ascolto schedulazioni)...")
+    logger.info("Starting Prefect orchestration server (listening to schedules)...")
     from prefect import serve
     serve(dep_ingest, dep_analysis, dep_generate)
 
@@ -121,6 +121,6 @@ if __name__ == "__main__":
         serve_scheduled_flows()
     else:
         print(
-            "Uso: python flow.py [daily-ingest | weekly-analysis | daily-generate | demo | serve]\n"
-            "Default: demo (esegue tutto in sequenza per test)"
+            "Usage: python flow.py [daily-ingest | weekly-analysis | daily-generate | demo | serve]\n"
+            "Default: demo (runs everything in sequence for test/demo purposes)"
         )
