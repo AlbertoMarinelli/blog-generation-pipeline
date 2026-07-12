@@ -55,27 +55,35 @@ class TrendScorer:
         df["day"] = df["published_dt"].dt.date
         daily_counts = df.groupby(["topic_id", "day"]).size().reset_index(name="daily_volume")
 
-        unique_days = sorted(df["day"].unique())
-        num_days = len(unique_days)
+        # Generate the full range of calendar days. At steady state, we expect 14 days.
+        # Fallback to the available range if the timeline is shorter.
+        min_date_val = df["published_dt"].min().date()
+        max_date_val = df["published_dt"].max().date()
+        total_days_diff = (max_date_val - min_date_val).days + 1
+        window_size = min(14, max(3, total_days_diff))
+        
+        all_calendar_days = pd.date_range(end=max_date_val, periods=window_size).date
+        num_days = len(all_calendar_days)
         topics_list = df["topic_id"].unique()
 
         predictions_dict = {}
 
-        # We need at least 3 distinct days to build lag_1, lag_2 and target (t+1)
+        # We need at least 3 distinct days to build lags and target (t+1)
         if num_days >= 3:
-            # Create a complete grid of (topic, day) to ensure zero-volume days are accounted for
+            # Create a complete grid of (topic, day) to ensure all calendar days (even with zero volume) are accounted for
             grid = []
             for t in topics_list:
-                for d in unique_days:
+                for d in all_calendar_days:
                     grid.append((t, d))
             grid_df = pd.DataFrame(grid, columns=["topic_id", "day"])
             
             panel_df = pd.merge(grid_df, daily_counts, on=["topic_id", "day"], how="left").fillna(0)
             panel_df = panel_df.sort_values(by=["topic_id", "day"])
 
-            # Compute Lags
+            # Compute Lags (lag_1, lag_2, lag_3)
             panel_df["lag_1"] = panel_df.groupby("topic_id")["daily_volume"].shift(1)
             panel_df["lag_2"] = panel_df.groupby("topic_id")["daily_volume"].shift(2)
+            panel_df["lag_3"] = panel_df.groupby("topic_id")["daily_volume"].shift(3)
             panel_df["target"] = panel_df.groupby("topic_id")["daily_volume"].shift(-1)
 
             # Drop NaNs to create training set
@@ -84,7 +92,7 @@ class TrendScorer:
             # We train XGBoost only if we have a minimum number of samples to avoid trivial models
             if len(train_df) >= 10:
                 print(f"Training XGBoost Regressor on {len(train_df)} panel data points...")
-                X = train_df[["daily_volume", "lag_1", "lag_2"]]
+                X = train_df[["daily_volume", "lag_1", "lag_2", "lag_3"]]
                 y = train_df["target"]
 
                 # Hyperparameters optimized for small datasets to prevent overfitting
@@ -96,23 +104,25 @@ class TrendScorer:
                 )
                 model.fit(X, y)
 
-                # Prepare prediction features (using current day, lag 1, and lag 2)
+                # Prepare prediction features (using current day, lag 1, lag 2, and lag 3)
                 predict_rows = []
                 for t in topics_list:
                     topic_data = panel_df[panel_df["topic_id"] == t].sort_values("day")
                     last_row = topic_data.iloc[-1]
                     second_last = topic_data.iloc[-2] if len(topic_data) > 1 else last_row
                     third_last = topic_data.iloc[-3] if len(topic_data) > 2 else second_last
+                    fourth_last = topic_data.iloc[-4] if len(topic_data) > 3 else third_last
 
                     predict_rows.append({
                         "topic_id": t,
                         "daily_volume": last_row["daily_volume"],
                         "lag_1": second_last["daily_volume"],
-                        "lag_2": third_last["daily_volume"]
+                        "lag_2": third_last["daily_volume"],
+                        "lag_3": fourth_last["daily_volume"]
                     })
                 
                 predict_df = pd.DataFrame(predict_rows)
-                preds = model.predict(predict_df[["daily_volume", "lag_1", "lag_2"]])
+                preds = model.predict(predict_df[["daily_volume", "lag_1", "lag_2", "lag_3"]])
                 preds = np.clip(preds, 0, None)  # Ensure volume is non-negative
                 predictions_dict = dict(zip(predict_df["topic_id"], preds))
             else:
