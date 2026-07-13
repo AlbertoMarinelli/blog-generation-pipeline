@@ -17,7 +17,7 @@ A FinTech company needs to automatically generate **700 high-quality blog posts 
 ---
 
 ## 🏗️ Design Approach & Architecture
-Relying on a static, limited list of keywords at this scale carries a high risk of generating repetitive or low-value content. This would negatively impact user experience and SEO performance, as search engines penalize duplicate or low-value articles [[1]](https://developers.google.com/search/docs/specialty/international/duplicate-content).
+Relying on a static, limited list of keywords at this scale carries a high risk of generating repetitive or low-value content. This would negatively impact user experience and SEO performance, as search engines penalize duplicate or low-value articles [[1]](https://developers.google.com/search/blog/2006/12/deftly-dealing-with-duplicate-content).
 
 To address this challenge, the solution adopts an **incremental design** that automatically harvests live FinTech news and market trends, using them as dynamic context. 
 
