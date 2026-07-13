@@ -4,11 +4,17 @@ from app.database.models import TopicTrendModel
 
 
 class TopicTrendRepository:
+    """Repository class for persisting and querying topic trends."""
 
     def __init__(self, session_factory=None):
         self.session_factory = session_factory or SessionLocal
 
     def save_topic_trends(self, trends: list[dict]):
+        """Saves a fresh snapshot of calculated topic trends, replacing existing records.
+
+        Args:
+            trends (list[dict]): A list of trend records to save.
+        """
         with self.session_factory() as session:
             # Clear old trends to keep it as a fresh snapshot
             session.query(TopicTrendModel).delete()

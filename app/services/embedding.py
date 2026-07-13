@@ -5,13 +5,14 @@ logger = logging.getLogger(__name__)
 _model = None
 
 def get_embedding_model() -> SentenceTransformer:
-    """
-    Ritorna l'istanza condivisa di SentenceTransformer (Singleton)
-    per evitare molteplici caricamenti del modello in memoria.
+    """Returns the shared SentenceTransformer singleton instance to prevent multiple model copies in memory.
+
+    Returns:
+        SentenceTransformer: Shared encoder model.
     """
     global _model
     if _model is None:
-        logger.info("Caricamento del modello SentenceTransformer ('all-MiniLM-L6-v2') condiviso...")
+        logger.info("Loading shared SentenceTransformer model ('all-MiniLM-L6-v2')...")
         _model = SentenceTransformer("all-MiniLM-L6-v2")
-        logger.info("Modello SentenceTransformer caricato con successo.")
+        logger.info("SentenceTransformer model loaded successfully.")
     return _model

@@ -72,3 +72,4 @@ data/*.db
 data/models/
 data/visualizations/
 data/posts/
+data/published_posts.index

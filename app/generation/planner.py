@@ -4,8 +4,17 @@ from app.database.models import ArticleModel
 
 
 class PostPlanner:
+    """Orchestrates daily blog post allocation across active trends and enriches with Google Trends queries."""
 
     def _fetch_google_trends(self, query: str) -> list[str]:
+        """Queries Google Trends for related search queries corresponding to the seed query.
+
+        Args:
+            query (str): The seed query.
+
+        Returns:
+            list[str]: A list of related queries.
+        """
         try:
             from pytrends.request import TrendReq
             # Create request with timeout and generic headers
@@ -21,6 +30,16 @@ class PostPlanner:
         return []
 
     def plan_posts(self, articles: list[ArticleModel], trends: list[dict], topic_keywords: dict = None) -> list[dict]:
+        """Allocates the daily post budget proportionally based on trend scores and brand compliance rates.
+
+        Args:
+            articles (list[ArticleModel]): The collected articles dataset.
+            trends (list[dict]): Computed trend statistics per topic.
+            topic_keywords (dict, optional): Map of topic IDs to key phrase strings.
+
+        Returns:
+            list[dict]: List of allocation plans per topic.
+        """
         if not trends or DAILY_POST_BUDGET <= 0:
             print("No trends available or daily post budget is set to 0. Post planning skipped.")
             return []

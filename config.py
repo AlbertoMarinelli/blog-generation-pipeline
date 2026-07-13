@@ -20,6 +20,8 @@ COMPLIANCE_SIMILARITY_THRESHOLD = 0.35
 
 DAILY_POST_BUDGET = 20
 
+# [DIDACTIC_LIMITATION] Defaulting to Gemini mock mode and key to allow the pipeline to run out of the box without requiring real external API keys.
 GEMINI_MOCK_MODE = True
 GEMINI_API_KEY = "MOCK"
+
 

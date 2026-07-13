@@ -12,13 +12,34 @@ from app.database.models import ArticleModel
 
 
 class FintechTopicModeler:
+    """Manages the lifecycle of a BERTopic model to discover, train, save, and predict topics from articles."""
 
     def __init__(self, model_dir: str = "data/models/bertopic_model", viz_dir: str = "data/visualizations"):
+        """Initializes the topic modeler with folders for saving model checkpoints and plotly visualizations.
+
+        Args:
+            model_dir (str): Path to serialize the pickled BERTopic model.
+            viz_dir (str): Path to export HTML visualization charts.
+        """
         self.model_dir = Path(model_dir)
         self.viz_dir = Path(viz_dir)
         self.model = None
 
-    def train(self, articles: list[ArticleModel], repository=None) -> tuple[list[int], dict[int, str]]:
+    def train(self, articles: list[ArticleModel], repository=None) -> tuple[list[int], dict[int, str], dict[int, str]]:
+        """Trains a BERTopic model on the text (title + summary + content) of the provided articles.
+
+        Uses caching to avoid re-computing SentenceTransformer embeddings for already cached articles.
+
+        Args:
+            articles (list[ArticleModel]): List of articles to cluster.
+            repository (ArticleRepository, optional): Repository instance to cache newly computed embeddings.
+
+        Returns:
+            tuple[list[int], dict[int, str], dict[int, str]]: 
+                - List of assigned topics for input articles.
+                - Dictionary mapping topic IDs to short label descriptions.
+                - Dictionary mapping topic IDs to top 10 keywords.
+        """
         if not articles:
             raise ValueError("No articles provided for training.")
 
@@ -142,6 +163,11 @@ class FintechTopicModeler:
         return topics, topic_labels, topic_keywords
 
     def save_visualizations(self, num_docs: int):
+        """Generates and exports interactive HTML charts for topic evaluation.
+
+        Args:
+            num_docs (int): The number of documents trained.
+        """
         if not self.model:
             return
 
@@ -176,6 +202,7 @@ class FintechTopicModeler:
                     print(f"Skipping topic hierarchy plot: {e}")
 
     def save_model(self):
+        """Pickles and saves the trained BERTopic model to disk."""
         if not self.model:
             return
         
@@ -188,6 +215,7 @@ class FintechTopicModeler:
             print(f"Failed to save topic model: {e}")
 
     def load_model(self):
+        """Loads a pickled BERTopic model checkpoint from disk if it exists."""
         if self.model_dir.exists():
             with open(self.model_dir, "rb") as f:
                 self.model = pickle.load(f)
@@ -196,13 +224,21 @@ class FintechTopicModeler:
             print("No saved topic model found.")
 
     def predict_topics(self, docs: list[str]) -> list[int]:
+        """Infers topic classifications for a list of new documents using the pre-trained model.
+
+        Args:
+            docs (list[str]): The list of raw text documents.
+
+        Returns:
+            list[int]: Topic IDs assigned to each document.
+        """
         self.load_model()
         if not self.model:
-            print("Nessun modello BERTopic caricato. Impossibile predire i topic.")
+            print("No BERTopic model loaded. Unable to predict topics.")
             return [-1] * len(docs)
         try:
             topics, _ = self.model.transform(docs)
             return [int(t) for t in topics]
         except Exception as e:
-            print(f"Errore durante la predizione dei topic con BERTopic: {e}")
+            print(f"Error predicting topics with BERTopic: {e}")
             return [-1] * len(docs)

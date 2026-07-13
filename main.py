@@ -12,7 +12,7 @@ from app.pipeline import (
     run_build_index
 )
 
-# Configura il logging di base per la console
+# Configure basic logging for the console output
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -24,40 +24,41 @@ logger = logging.getLogger("cli")
 
 
 def main():
+    """Main CLI entry point for the Fintech Blog Generation Pipeline."""
     parser = argparse.ArgumentParser(
         description="Fintech Blog Generation Pipeline CLI",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     
-    # Argomenti globali
+    # Global arguments
     parser.add_argument(
         "-v", "--verbose",
         action="store_true",
-        help="Abilita log dettagliati di livello DEBUG"
+        help="Enable verbose debug logging"
     )
 
-    # Subcommands
+    # Subcommands configuration
     subparsers = parser.add_subparsers(
         dest="command",
-        help="Comando specifico della pipeline da avviare"
+        help="Specific pipeline command to run"
     )
 
-    subparsers.add_parser("ingest", help="Esegue la raccolta RSS, scaricamento e pulizia articoli.")
-    subparsers.add_parser("compliance", help="Verifica la conformità del brand per gli articoli pendenti.")
-    subparsers.add_parser("classify", help="Classifica gli articoli conformi non assegnati usando il modello esistente.")
-    subparsers.add_parser("analyze", help="Esegue topic modeling BERTopic, scoring trend XGBoost e piano post.")
-    subparsers.add_parser("generate", help="Genera gli articoli di blog finali (RAG + Gemini) basati sul piano.")
-    subparsers.add_parser("build-index", help="Costruisce o rigenera l'indice vettoriale dei post pubblicati usando FAISS.")
-    subparsers.add_parser("run-all", help="Avvia l'intera pipeline in sequenza (comportamento predefinito).")
+    subparsers.add_parser("ingest", help="Collect RSS feeds, download, and clean articles.")
+    subparsers.add_parser("compliance", help="Check brand compliance for pending articles.")
+    subparsers.add_parser("classify", help="Classify compliant articles using the existing BERTopic model.")
+    subparsers.add_parser("analyze", help="Run BERTopic discovery, XGBoost trend scoring, and planning.")
+    subparsers.add_parser("generate", help="Generate final blog posts using RAG and Gemini.")
+    subparsers.add_parser("build-index", help="Build/rebuild the vector index of published posts using FAISS.")
+    subparsers.add_parser("run-all", help="Run the entire pipeline sequentially (default behavior).")
 
     args = parser.parse_args()
 
-    # Imposta il livello di log in base all'argomento verbose
+    # Adjust log level based on verbosity flag
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
-        logger.debug("Livello di logging impostato su DEBUG.")
+        logger.debug("Logging level set to DEBUG.")
 
-    # Esecuzione del comando selezionato
+    # Execute target pipeline phase
     if args.command == "ingest":
         run_ingest()
     elif args.command == "compliance":
@@ -71,9 +72,9 @@ def main():
     elif args.command == "build-index":
         run_build_index()
     elif args.command == "run-all" or not args.command:
-        # Se non viene specificato alcun comando, esegui tutto (retrocompatibilità)
+        # Fallback to running all phases if no command is specified for backward compatibility
         if not args.command:
-            logger.info("Nessun comando specificato. Avvio della pipeline completa per default...")
+            logger.info("No command specified. Running full pipeline end-to-end...")
         run_all()
 
 
