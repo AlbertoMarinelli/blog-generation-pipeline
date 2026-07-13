@@ -282,6 +282,7 @@ def run_analyze():
         logger.exception(f"Critical error during analysis and topic modeling: {e}")
 
 
+
 def run_generate():
     """Generates blog articles using RAG and Gemini based on the active plan in the database."""
     init_database()
@@ -466,6 +467,14 @@ def run_generate():
 def run_all():
     """Runs all pipeline phases end-to-end sequentially."""
     logger.info("=== STARTING END-TO-END PIPELINE ===")
+    
+    # Import legacy archive posts from data/posts/old for the end-to-end demo
+    try:
+        from app.services.post_importer import import_old_posts
+        import_old_posts()
+    except Exception as e:
+        logger.error(f"Error importing old posts: {e}")
+
     run_ingest()
     run_compliance()
     run_analyze()

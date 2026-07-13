@@ -65,9 +65,23 @@ def daily_generation_flow():
     generate_task()
 
 
-# 4. Demo Pipeline: Run all phases in sequence for debugging/evaluation
+# 4. Setup Task for Demo environment
+@task(name="Import Old Posts")
+def import_old_posts_task():
+    logger.info("Importing legacy/old posts for the demo environment...")
+    from app.services.post_importer import import_old_posts
+    try:
+        import_old_posts()
+    except Exception as e:
+        logger.error(f"Error importing old posts: {e}")
+
+
+# 5. Demo Pipeline: Run all phases in sequence for debugging/evaluation
 @flow(name="Demo End-to-End Pipeline")
 def demo_pipeline():
+    logger.info("--- [DEMO E2E] Phase 0: Setup and legacy data import ---")
+    import_old_posts_task()
+
     logger.info("--- [DEMO E2E] Phase 1: Ingest, Compliance & Classification ---")
     ingest_task()
     compliance_task()

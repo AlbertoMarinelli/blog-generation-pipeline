@@ -36,6 +36,16 @@ class BlogGenerator:
             return self._generate_gemini_post(topic_label, keywords, search_trends, rag_articles, feedback=feedback)
 
     def _generate_mock_post(self, topic_label: str, keywords: str, search_trends: str, rag_articles: list[ArticleModel], feedback: str = None) -> str:
+        import re
+        import random
+        import datetime
+
+        def slugify(text: str) -> str:
+            text = text.lower()
+            text = re.sub(r'[^\w\s-]', '', text)
+            text = re.sub(r'[\s_-]+', '-', text)
+            return text.strip('-')
+
         # Extract main keywords for header
         kw_list = [k.strip() for k in keywords.split(",") if k.strip()]
         main_kw = kw_list[0].capitalize() if kw_list else "Innovazione Fintech"
@@ -43,15 +53,37 @@ class BlogGenerator:
         
         date_str = datetime.date.today().strftime("%d %B %Y")
         
-        # Build article summaries section
+        # Determine Title, Slug, Meta Description, and Body based on RAG articles
         if rag_articles:
-            articles_section = ""
+            # Take title and part of description from the first RAG article to make posts diverse
+            ref_art = rag_articles[0]
+            title = ref_art.title if ref_art.title else f"Dinamiche di Mercato su {topic_label}"
+            title = title.replace('"', '\\"') # escape quotes for frontmatter
+            
+            # Create a unique slug from title
+            slug = slugify(title)
+            if not slug:
+                slug = f"focus-{main_kw.lower().replace(' ', '-')}-futuro-fintech-{random.randint(100, 999)}"
+            
+            snippet = ref_art.summary if ref_art.summary else (ref_art.content[:150] + "..." if ref_art.content else "analisi dettagliata")
+            meta_description = f"Scopri di più su: {title}. {snippet}"
+            if len(meta_description) > 160:
+                meta_description = meta_description[:157] + "..."
+            meta_description = meta_description.replace('"', '\\"')
+            
+            # Build article summaries section
+            articles_section = "### Articoli e Notizie analizzate:\n\n"
             for i, art in enumerate(rag_articles):
-                snippet = art.summary if art.summary else (art.content[:200] + "..." if art.content else "Nessun contenuto disponibile.")
-                articles_section += f"### {i+1}. {art.title}\n"
+                art_snippet = art.summary if art.summary else (art.content[:300] + "..." if art.content else "Nessun contenuto disponibile.")
+                articles_section += f"#### {i+1}. {art.title}\n"
                 articles_section += f"*Fonte: {art.source}* | *Link: [{art.url}]({art.url})*\n\n"
-                articles_section += f"{snippet}\n\n"
+                articles_section += f"{art_snippet}\n\n"
         else:
+            # Standard fallback
+            rand_id = random.randint(100, 999)
+            title = f"L'impatto di {main_kw} nel Futuro del Fintech (Analisi {rand_id})"
+            slug = f"impatto-{main_kw.lower().replace(' ', '-')}-futuro-fintech-{rand_id}"
+            meta_description = f"Scopri come {main_kw.lower()} e {sub_kw.lower()} stanno ridefinendo i servizi finanziari digitali nel settore fintech."
             articles_section = (
                 "*Attenzione: Nessuna fonte RAG diretta disponibile per questo post. "
                 "Generato come articolo di analisi teorica e di scenario di mercato.*\n\n"
@@ -59,16 +91,14 @@ class BlogGenerator:
                 "delle infrastrutture bancarie digitali e sulle tendenze di crescita a medio termine.\n\n"
             )
 
-        slug = f"impatto-{main_kw.lower().replace(' ', '-')}-futuro-fintech"
-        
         # Mock post template with clean markdown structure and YAML Front Matter
         post_md = f"""---
-title: "L'impatto di {main_kw} nel Futuro del Fintech"
-meta_description: "Scopri come {main_kw.lower()} e {sub_kw.lower()} stanno ridefinendo i servizi finanziari digitali nel settore fintech."
+title: "{title}"
+meta_description: "{meta_description}"
 slug: "{slug}"
 ---
 
-# L'impatto di {main_kw} nel Futuro del Fintech
+# {title}
 *Data di pubblicazione: {date_str}*  
 *Trend Keywords: {keywords}*  
 *Google Trends Correlati: {search_trends if search_trends else "Nessuno"}*
