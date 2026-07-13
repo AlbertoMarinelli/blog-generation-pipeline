@@ -51,7 +51,7 @@ def run_ingest():
         return
 
     # [DIDACTIC_LIMITATION] Slice to the first 150 articles to optimize execution speed in educational demo pipelines.
-    articles = articles[:150]
+    # articles = articles[:150]
     logger.info("Decoding Google News links...")
 
     def decode_single(article):
@@ -77,7 +77,7 @@ def run_ingest():
 
     if new_articles:
         # [DIDACTIC_LIMITATION] Limit newly downloaded articles to 100 to reduce resource usage and run quicker in local tests.
-        new_articles = new_articles[:100]
+        # new_articles = new_articles[:100]
         logger.info(f"Downloading full text for {len(new_articles)} articles...")
         downloader = ArticleDownloader()
         new_articles = downloader.process(new_articles)
